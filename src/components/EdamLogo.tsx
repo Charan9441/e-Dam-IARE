@@ -4,6 +4,8 @@ interface EdamLogoProps {
   showText?: boolean;
 }
 
+import edamLogo from '../assets/edam-logo.jpg';
+
 export const EdamLogo = ({ 
   className = '', 
   size = 36,
@@ -12,7 +14,7 @@ export const EdamLogo = ({
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
       <img 
-        src="/edam-logo.png" 
+        src={edamLogo} 
         alt="e-DAM Logo" 
         style={{ width: size, height: size }}
         className="object-contain"

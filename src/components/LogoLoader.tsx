@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { animate } from 'animejs';
-import edamLogo from '../assets/edam-logo.png';
+import edamLogo from '../assets/edam-logo.jpg';
 
 interface LogoLoaderProps {
   onComplete: () => void;
@@ -150,12 +150,12 @@ export const LogoLoader = ({ onComplete, onZoomStart }: LogoLoaderProps) => {
         />
         <div
           ref={logoWrapperRef}
-          className="relative z-10 flex items-center justify-center p-6 transition-all drop-shadow-[0_0_35px_rgba(168,85,247,0.65)]"
+          className="relative z-10 flex flex-col items-center justify-center p-6 transition-all drop-shadow-[0_0_35px_rgba(168,85,247,0.65)]"
         >
-          <img 
-            src={edamLogo} 
-            alt="EDAM Logo" 
-            className="w-[180px] md:w-[240px] h-auto object-contain" 
+          <img
+            src={edamLogo}
+            alt="EDAM Logo"
+            className="w-[150px] md:w-[200px] h-auto object-contain mb-8"
           />
         </div>
       </div>
