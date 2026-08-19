@@ -15,7 +15,7 @@ export const EdamLogo = ({
         src="/edam-logo.png" 
         alt="e-DAM Logo" 
         style={{ width: size, height: size }}
-        className="object-contain filter drop-shadow-[0_0_10px_rgba(192,38,255,0.7)]"
+        className="object-contain"
       />
       {showText && (
         <div className="flex flex-col">
