@@ -20,14 +20,5 @@
     "hooks": "@/hooks"
   },
   "menuColor": "default",
-  "menuAccent": "subtle",
-  "registries": {
-    "@bklit": "https://ui.bklit.com/r/{name}.json",
-    "@reactbits-starter": {
-      "url": "https://pro.reactbits.dev/api/r/starter/{name}.json",
-      "headers": {
-        "Authorization": "Bearer ${REACTBITS_LICENSE_KEY}"
-      }
-    }
-  }
+  "menuAccent": "subtle"
 }
