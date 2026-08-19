@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="none">
+  <defs>
+    <linearGradient id="edam-fav-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stopColor="#D946EF" />
+      <stop offset="100%" stopColor="#863BFF" />
+    </linearGradient>
+  </defs>
+  <path 
+    d="M 67 25 A 30 30 0 1 0 77 41" 
+    stroke="url(#edam-fav-grad)" 
+    stroke-width="8" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  <path 
+    d="M 28 74 L 74 28 L 84 38" 
+    stroke="url(#edam-fav-grad)" 
+    stroke-width="8" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+  <path 
+    d="M 52 50 C 36 50 28 60 28 74 C 44 74 52 64 52 50" 
+    stroke="url(#edam-fav-grad)" 
+    stroke-width="8" 
+    stroke-linecap="round" 
+    stroke-linejoin="round"
+  />
+</svg>
