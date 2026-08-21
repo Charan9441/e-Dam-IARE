@@ -16,6 +16,7 @@ export default {
     extend: {
       fontFamily: {
         sans: ["Space Grotesk", "sans-serif"],
+        heading: ["Fraunces", "serif"],
       },
       colors: {
         background: "#030305",
@@ -25,6 +26,7 @@ export default {
           bright: "#A855F7",
           deep: "#5B21B6",
           lavender: "#C4B5FD",
+          magenta: "#C026FF",
         },
         text: {
           DEFAULT: "#F5F3FF",

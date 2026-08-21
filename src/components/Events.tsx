@@ -1,33 +1,33 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
-import { ArrowUpRight, Sparkles } from 'lucide-react';
+import { ArrowUpRight, Calendar } from 'lucide-react';
 
 const events = [
   {
     id: 1,
     title: "Design Sprint 2026",
-    date: "Mar 15, 2026",
+    date: "Sep 12, 2026",
     category: "Design",
     description: "A 48-hour intensive UI/UX design challenge focused on solving real-world accessibility issues."
   },
   {
     id: 2,
     title: "Creative Coding Workshop",
-    date: "Apr 02, 2026",
+    date: "Oct 03, 2026",
     category: "Development",
     description: "Learn how to use Three.js and WebGL to create stunning interactive web experiences."
   },
   {
     id: 3,
     title: "Branding Bootcamp",
-    date: "Apr 18, 2026",
+    date: "Oct 24, 2026",
     category: "Marketing",
     description: "Master the art of visual storytelling and brand strategy with industry experts."
   },
   {
     id: 4,
     title: "e-DAM Hackathon",
-    date: "May 10, 2026",
+    date: "Jan 16, 2027",
     category: "All Domains",
     description: "Our flagship annual event where designers, developers, and marketers build full products in 3 days."
   }
@@ -48,13 +48,13 @@ export const Events = () => {
         >
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest mb-4">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Cosmic Expeditions</span>
+              <Calendar className="w-3.5 h-3.5" />
+              <span>What's Next</span>
             </div>
             <h3 className="text-4xl md:text-5xl font-extrabold tracking-tight">UPCOMING EVENTS</h3>
           </div>
           <a href="#join" className="text-primary hover:text-white transition-colors flex items-center gap-2 pb-2 border-b border-primary/30 hover:border-white font-semibold">
-            <span>View All Expeditions</span>
+            <span>View All Events</span>
             <ArrowUpRight className="w-4 h-4" />
           </a>
         </motion.div>

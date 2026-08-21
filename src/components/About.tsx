@@ -1,6 +1,23 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
-import { Code2, MonitorPlay, PenTool, Sparkles } from 'lucide-react';
+
+const pillars = [
+  {
+    id: "01",
+    title: "Learn by building",
+    desc: "No lecture-only tracks. Every workshop ends with something shipped, not just slides."
+  },
+  {
+    id: "02",
+    title: "Cross-domain by default",
+    desc: "Designers work with developers, developers work with marketers — teams mirror how real products actually get made."
+  },
+  {
+    id: "03",
+    title: "Portfolio over paperwork",
+    desc: "Every project you touch here is something you can point to later — case studies, repos, and real credit."
+  }
+];
 
 export const About = () => {
   const ref = useRef(null);
@@ -9,18 +26,18 @@ export const About = () => {
   return (
     <section id="about" className="py-24 relative overflow-hidden" ref={ref}>
       <div className="container mx-auto px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start">
+
           <div className="flex flex-col gap-8">
-            <motion.h2 
+            <motion.h2
               className="text-4xl md:text-5xl font-extrabold leading-tight text-[#F5F3FF]"
               initial={{ opacity: 0, y: 30 }}
               animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
               transition={{ duration: 0.8, ease: "easeOut" }}
             >
               MORE THAN A CLUB.<br />
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#8B5CF6] via-[#A855F7] to-[#C4B5FD]">
-                A CREATIVE TECH COMMUNITY.
+              <span className="font-heading italic font-medium text-transparent bg-clip-text bg-gradient-to-r from-[#8B5CF6] via-[#A855F7] to-[#C4B5FD]">
+                A creative tech community.
               </span>
             </motion.h2>
 
@@ -30,91 +47,39 @@ export const About = () => {
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                 transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
               >
-                e-DAM (e-Designing and Marketing) is the premier technical community at IARE where design meets technology. We are a collective of developers, designers, and digital creators pushing the boundaries of what's possible.
+                e-DAM (e-Designing and Marketing) is IARE's student-run community for design, development, and digital marketing. We're developers, designers, and marketers who'd rather build something real than sit through another slide deck.
               </motion.p>
-              
+
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                 transition={{ duration: 0.8, delay: 0.3, ease: "easeOut" }}
               >
-                Our mission is to foster digital innovation and creative thinking. Whether you're building next-gen web applications, crafting beautiful user interfaces, or strategizing digital marketing campaigns, e-DAM provides the platform to transform ideas into reality.
+                We run workshops, ship projects, and put on events across four domains — UI/UX, web & mobile development, digital marketing, and media production. If you want to learn by doing, this is where that happens.
               </motion.p>
             </div>
-            
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
-              transition={{ duration: 0.8, delay: 0.4, ease: "easeOut" }}
-              className="flex gap-6 pt-4"
-            >
-              <div className="flex items-center gap-2 text-[#F5F3FF]">
-                <Sparkles className="w-5 h-5 text-[#8B5CF6]" />
-                <span className="font-medium">Innovation</span>
-              </div>
-              <div className="flex items-center gap-2 text-[#F5F3FF]">
-                <Code2 className="w-5 h-5 text-[#8B5CF6]" />
-                <span className="font-medium">Technology</span>
-              </div>
-              <div className="flex items-center gap-2 text-[#F5F3FF]">
-                <PenTool className="w-5 h-5 text-[#8B5CF6]" />
-                <span className="font-medium">Design</span>
-              </div>
-            </motion.div>
           </div>
 
-          <motion.div 
-            className="relative h-[500px] w-full rounded-3xl glass p-8 overflow-hidden group"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.95 }}
-            transition={{ duration: 1, delay: 0.3, ease: [0.16, 1, 0.3, 1] }}
-          >
-            {/* Animated background glow */}
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-primary/30 rounded-full blur-[80px] group-hover:scale-110 transition-transform duration-1000"></div>
-            
-            <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[size:32px_32px] [mask-image:radial-gradient(ellipse_60%_60%_at_50%_50%,black_100%,transparent_100%)]"></div>
-            
-            {/* Abstract UI Elements */}
-            <div className="relative z-10 w-full h-full flex flex-col items-center justify-center gap-6">
-              <motion.div 
-                className="w-48 h-32 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md p-4 flex flex-col gap-3 shadow-2xl"
-                animate={{ y: [0, -10, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+          <div className="flex flex-col">
+            {pillars.map((pillar, index) => (
+              <motion.div
+                key={pillar.id}
+                className="group flex gap-6 py-7 border-b border-white/10 first:border-t"
+                initial={{ opacity: 0, x: 20 }}
+                animate={isInView ? { opacity: 1, x: 0 } : { opacity: 0, x: 20 }}
+                transition={{ duration: 0.6, delay: 0.2 + index * 0.12, ease: "easeOut" }}
               >
-                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
-                  <PenTool className="w-4 h-4 text-primary" />
+                <span className="font-heading text-3xl text-primary/40 group-hover:text-primary transition-colors duration-300 shrink-0 pt-0.5">
+                  {pillar.id}
+                </span>
+                <div>
+                  <h4 className="text-xl font-bold text-[#F5F3FF] mb-2">{pillar.title}</h4>
+                  <p className="text-[#928A9F] leading-relaxed">{pillar.desc}</p>
                 </div>
-                <div className="w-3/4 h-2 bg-white/20 rounded-full"></div>
-                <div className="w-1/2 h-2 bg-white/10 rounded-full"></div>
               </motion.div>
-              
-              <div className="flex gap-6">
-                <motion.div 
-                  className="w-32 h-32 rounded-xl bg-white/5 border border-white/10 backdrop-blur-md p-4 flex flex-col gap-3 shadow-2xl"
-                  animate={{ y: [0, 15, 0] }}
-                  transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-                >
-                  <div className="w-8 h-8 rounded-full bg-primary-bright/20 flex items-center justify-center">
-                    <Code2 className="w-4 h-4 text-primary-bright" />
-                  </div>
-                  <div className="w-full h-2 bg-white/20 rounded-full mt-auto"></div>
-                </motion.div>
-                
-                <motion.div 
-                  className="w-40 h-40 rounded-xl bg-primary/10 border border-primary/30 backdrop-blur-md p-4 flex flex-col gap-3 shadow-[0_0_30px_rgba(168,85,247,0.2)]"
-                  animate={{ y: [0, -15, 0] }}
-                  transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
-                >
-                  <div className="w-10 h-10 rounded-full bg-primary/30 flex items-center justify-center mb-auto">
-                    <MonitorPlay className="w-5 h-5 text-white" />
-                  </div>
-                  <div className="w-full h-2 bg-primary/40 rounded-full"></div>
-                  <div className="w-2/3 h-2 bg-primary/20 rounded-full"></div>
-                </motion.div>
-              </div>
-            </div>
-          </motion.div>
-          
+            ))}
+          </div>
+
         </div>
       </div>
     </section>

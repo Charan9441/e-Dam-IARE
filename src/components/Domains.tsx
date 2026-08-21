@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { motion, useInView, AnimatePresence } from 'motion/react';
-import { PenTool, Code2, Megaphone, Camera, Sparkles, ArrowUpRight } from 'lucide-react';
+import { PenTool, Code2, Megaphone, Camera, LayoutGrid, ArrowUpRight } from 'lucide-react';
 
 const domainsData = [
   {
@@ -10,7 +10,8 @@ const domainsData = [
     tagline: "Crafting intuitive digital experiences & visual identities.",
     skills: ["UI/UX Systems", "Graphic Design", "3D & Motion Art", "Visual Identity"],
     stats: "24+ Design Sprints Completed",
-    color: "from-purple-500 via-purple-600 to-indigo-600"
+    color: "from-primary-deep via-primary to-primary-lavender",
+    hubBlurb: "Portfolio reviews, Figma jams, and hands-on critique sessions for anyone who wants their design work to hold up outside a classroom."
   },
   {
     id: "02",
@@ -19,7 +20,8 @@ const domainsData = [
     tagline: "Engineering high-performance web applications & platforms.",
     skills: ["Full-Stack Web", "Mobile Apps", "Creative Coding", "AI Integration"],
     stats: "18+ Live Web Platforms",
-    color: "from-primary via-primary-bright to-primary-magenta"
+    color: "from-primary via-primary-bright to-primary-lavender",
+    hubBlurb: "Build and ship real, working software — from campus tools to open-source side projects — alongside people who'll actually review your PRs."
   },
   {
     id: "03",
@@ -28,7 +30,8 @@ const domainsData = [
     tagline: "Amplifying brand presence through strategic growth media.",
     skills: ["Brand Strategy", "Social Growth", "SEO & Analytics", "Campaign Ops"],
     stats: "150k+ Audience Reach",
-    color: "from-pink-500 via-rose-500 to-primary-magenta"
+    color: "from-primary-magenta via-primary-bright to-primary",
+    hubBlurb: "Run real campaigns for real events — copy, content calendars, analytics, and the reporting that goes with it."
   },
   {
     id: "04",
@@ -37,7 +40,8 @@ const domainsData = [
     tagline: "Capturing powerful visual storytelling through video & photography.",
     skills: ["Cinematography", "Photo Operations", "VFX & Post-Production", "Event Media"],
     stats: "40+ Events Covered",
-    color: "from-blue-500 via-indigo-500 to-purple-600"
+    color: "from-primary-deep via-primary-magenta to-primary-bright",
+    hubBlurb: "Shoot, edit, and cover every e-DAM event — camera work, video editing, and the after-effects that make a recap actually watchable."
   }
 ];
 
@@ -48,9 +52,6 @@ export const Domains = () => {
 
   return (
     <section id="domains" className="py-28 relative z-10" ref={ref}>
-      {/* Background glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/10 rounded-full blur-[160px] pointer-events-none" />
-
       <div className="container mx-auto px-6 relative z-10">
         <motion.div 
           className="mb-16 flex flex-col md:flex-row md:items-end justify-between gap-6"
@@ -60,8 +61,8 @@ export const Domains = () => {
         >
           <div>
             <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-primary/30 bg-primary/10 text-primary text-xs font-semibold uppercase tracking-widest mb-4">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Cosmic Core Disciplines</span>
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>What We Do</span>
             </div>
             <h3 className="text-4xl md:text-5xl font-extrabold tracking-tight">EXPLORE OUR DOMAINS</h3>
           </div>
@@ -70,8 +71,8 @@ export const Domains = () => {
           </p>
         </motion.div>
 
-        {/* Interactive Domain Selector Tabs (Astral Frontier Style) */}
-        <div className="flex flex-wrap items-center justify-center gap-3 mb-12">
+        {/* Domain Selector */}
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 mb-12 border-b border-white/10">
           {domainsData.map((d, index) => {
             const Icon = d.icon;
             const isActive = activeTab === index;
@@ -79,14 +80,18 @@ export const Domains = () => {
               <button
                 key={d.id}
                 onClick={() => setActiveTab(index)}
-                className={`flex items-center gap-2.5 px-6 py-3.5 rounded-full border transition-all duration-300 font-semibold text-sm backdrop-blur-xl ${
-                  isActive
-                    ? 'bg-gradient-to-r from-primary to-primary-magenta border-primary-bright text-white shadow-[0_0_25px_rgba(192,38,255,0.4)] scale-105'
-                    : 'bg-white/5 border-white/10 text-white/70 hover:text-white hover:bg-white/10 hover:border-white/20'
+                className={`relative flex items-center gap-2 pb-4 font-semibold text-sm transition-colors duration-300 ${
+                  isActive ? 'text-white' : 'text-white/50 hover:text-white/80'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span>{d.title}</span>
+                {isActive && (
+                  <motion.span
+                    layoutId="domain-tab-indicator"
+                    className="absolute -bottom-px left-0 right-0 h-[2px] bg-primary"
+                  />
+                )}
               </button>
             );
           })}
@@ -105,9 +110,8 @@ export const Domains = () => {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -20, scale: 0.98 }}
                   transition={{ duration: 0.4 }}
-                  className="relative rounded-3xl border border-white/15 bg-gradient-to-br from-white/10 via-surface/80 to-surface/90 p-8 md:p-12 backdrop-blur-2xl overflow-hidden shadow-[0_0_50px_rgba(192,38,255,0.15)]"
+                  className="relative rounded-2xl border border-white/10 bg-surface/60 p-8 md:p-12 overflow-hidden"
                 >
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-primary/20 rounded-full blur-3xl pointer-events-none" />
                   
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
                     <div className="lg:col-span-7 space-y-6">
@@ -131,9 +135,9 @@ export const Domains = () => {
                       </div>
 
                       <div className="pt-4 flex items-center gap-4">
-                        <a 
-                          href="#join" 
-                          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-white text-black font-semibold text-sm hover:scale-105 transition-transform"
+                        <a
+                          href="#join"
+                          className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white text-black font-semibold text-sm hover:bg-white/90 transition-colors"
                         >
                           <span>Join {domain.title}</span>
                           <ArrowUpRight className="w-4 h-4" />
@@ -148,7 +152,7 @@ export const Domains = () => {
                           <Icon className="w-12 h-12 text-primary-bright" />
                         </div>
                         <div className="text-xl font-bold text-white mb-2">{domain.title} Hub</div>
-                        <p className="text-xs text-muted">Empowering students to build world-class portfolios and launch creative tech projects.</p>
+                        <p className="text-xs text-muted">{domain.hubBlurb}</p>
                       </div>
                     </div>
                   </div>

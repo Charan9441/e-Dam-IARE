@@ -48,9 +48,9 @@ export const Navbar = () => {
         </nav>
 
         <div className="hidden md:block">
-          <a 
+          <a
             href="#join"
-            className="group flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/5 hover:bg-white/10 border border-[#8B5CF6]/30 hover:border-[#8B5CF6] transition-all text-sm font-semibold shadow-[0_0_15px_rgba(139,92,246,0.15)]"
+            className="group flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 border border-[#8B5CF6]/30 hover:border-[#8B5CF6] transition-all text-sm font-semibold"
           >
             <span>Join e-DAM</span>
             <ArrowRight className="w-4 h-4 text-[#8B5CF6] group-hover:translate-x-1 transition-transform" />

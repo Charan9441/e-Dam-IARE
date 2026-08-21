@@ -18,17 +18,17 @@ export const Team = () => {
   return (
     <section id="team" className="py-24 relative" ref={ref}>
       <div className="container mx-auto px-6">
-        <motion.div 
-          className="mb-16 md:mb-24 text-center"
+        <motion.div
+          className="mb-16 md:mb-20"
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
           transition={{ duration: 0.8 }}
         >
-          <h2 className="text-sm font-bold tracking-[0.2em] text-primary uppercase mb-4">The Minds Behind</h2>
+          <h2 className="text-sm font-bold tracking-[0.2em] text-primary uppercase mb-4">The People Behind It</h2>
           <h3 className="text-4xl md:text-5xl font-bold">MEET THE TEAM</h3>
         </motion.div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
           {team.map((member, index) => (
             <TeamMember key={member.id} member={member} index={index} isInView={isInView} />
           ))}
@@ -40,45 +40,42 @@ export const Team = () => {
 
 const TeamMember = ({ member, index, isInView }: { member: typeof team[0], index: number, isInView: boolean }) => {
   return (
-    <motion.div 
-      className="group relative overflow-hidden rounded-2xl aspect-[3/4] bg-surface cursor-pointer"
-      initial={{ opacity: 0, y: 40 }}
-      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 40 }}
-      transition={{ duration: 0.8, delay: index * 0.1 }}
+    <motion.div
+      className="group"
+      initial={{ opacity: 0, y: 30 }}
+      animate={isInView ? { opacity: 1, y: 0 } : { opacity: 0, y: 30 }}
+      transition={{ duration: 0.6, delay: index * 0.08 }}
     >
-      <img 
-        src={member.img} 
-        alt={member.name} 
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-      />
-      
-      {/* Default Gradient */}
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/20 to-transparent transition-opacity duration-500" />
-      
-      {/* Purple Hover Overlay */}
-      <div className="absolute inset-0 bg-primary/80 mix-blend-multiply opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-      <div className="absolute inset-0 bg-gradient-to-t from-background via-background/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+      <div className="relative overflow-hidden rounded-xl aspect-[4/5] bg-surface border border-white/10 group-hover:border-primary/40 transition-colors duration-300">
+        <img
+          src={member.img}
+          alt={member.name}
+          className="absolute inset-0 w-full h-full object-cover grayscale-[40%] group-hover:grayscale-0 transition-all duration-500"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/10 to-transparent" />
 
-      {/* Domain Badge */}
-      <div className="absolute top-4 right-4 px-3 py-1 rounded-full bg-background/50 backdrop-blur-md border border-white/10 text-xs font-bold tracking-widest uppercase">
-        {member.domain}
+        <div className="absolute top-3 right-3 px-2.5 py-1 rounded-md bg-background/60 border border-white/10 text-[10px] font-bold tracking-widest uppercase text-white/80">
+          {member.domain}
+        </div>
+
+        <div className="absolute bottom-0 left-0 right-0 p-4 flex items-center justify-between">
+          <div className="flex gap-2.5">
+            <a href="#" aria-label={`${member.name} on LinkedIn`} className="w-8 h-8 rounded-md bg-white/10 hover:bg-primary hover:text-white flex items-center justify-center text-white/70 transition-colors">
+              <Linkedin className="w-3.5 h-3.5" />
+            </a>
+            <a href="#" aria-label={`${member.name} on Instagram`} className="w-8 h-8 rounded-md bg-white/10 hover:bg-primary hover:text-white flex items-center justify-center text-white/70 transition-colors">
+              <Instagram className="w-3.5 h-3.5" />
+            </a>
+            <a href="#" aria-label={`${member.name} on GitHub`} className="w-8 h-8 rounded-md bg-white/10 hover:bg-primary hover:text-white flex items-center justify-center text-white/70 transition-colors">
+              <Github className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
       </div>
 
-      <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col items-center text-center transform translate-y-8 group-hover:translate-y-0 transition-transform duration-500">
-        <h4 className="text-2xl font-bold font-heading mb-1">{member.name}</h4>
-        <p className="text-primary-lavender font-medium mb-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">{member.role}</p>
-        
-        <div className="flex gap-4 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-200">
-          <a href="#" className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md flex items-center justify-center transition-colors">
-            <Linkedin className="w-5 h-5" />
-          </a>
-          <a href="#" className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md flex items-center justify-center transition-colors">
-            <Instagram className="w-5 h-5" />
-          </a>
-          <a href="#" className="w-10 h-10 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur-md flex items-center justify-center transition-colors">
-            <Github className="w-5 h-5" />
-          </a>
-        </div>
+      <div className="pt-4">
+        <h4 className="text-lg font-bold font-heading text-[#F5F3FF]">{member.name}</h4>
+        <p className="text-sm text-muted">{member.role}</p>
       </div>
     </motion.div>
   );

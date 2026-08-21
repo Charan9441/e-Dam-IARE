@@ -26,9 +26,6 @@ export const Stats = () => {
 
   return (
     <section className="py-24 relative overflow-hidden bg-black/40 border-y border-white/5" ref={ref}>
-      {/* Background glow */}
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] bg-primary/10 rounded-full blur-[140px] pointer-events-none" />
-
       <div className="container mx-auto px-6 relative z-10">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
           
