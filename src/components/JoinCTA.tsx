@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { motion, useInView } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
+import { EdamLogo } from './EdamLogo';
 
 export const JoinCTA = () => {
   const ref = useRef(null);
@@ -18,9 +19,7 @@ export const JoinCTA = () => {
           animate={isInView ? { opacity: 1, scale: 1 } : { opacity: 0, scale: 0.5 }}
           transition={{ duration: 1, type: "spring", bounce: 0.4 }}
         >
-          <div className="font-heading italic font-medium text-2xl tracking-tight">
-            e-DAM
-          </div>
+          <EdamLogo size={80} />
         </motion.div>
 
         <motion.h2 
