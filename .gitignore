@@ -11,6 +11,28 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
+
+# Temporary and Scratch
+scratch/
+*.tmp
+
+# Agent & Dev Tooling Artifacts
+.agent/
+.agents/
+.gemini/
+.gsd/
+.claude/
+GSD-STYLE.md
+PROJECT_RULES.md
+VERSION
+adapters/
+model_capabilities.yaml
+scripts/validate-*
+scripts/setup_*
+scripts/search_*
 
 # Editor directories and files
 .vscode/*

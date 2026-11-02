@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+﻿import { useRef, useState } from 'react';
 import { motion, useInView, AnimatePresence } from 'motion/react';
 import { PenTool, Code2, Megaphone, Camera, LayoutGrid, ArrowUpRight } from 'lucide-react';
 
@@ -21,7 +21,7 @@ const domainsData = [
     skills: ["Full-Stack Web", "Mobile Apps", "Creative Coding", "AI Integration"],
     stats: "18+ Live Web Platforms",
     color: "from-primary via-primary-bright to-primary-lavender",
-    hubBlurb: "Build and ship real, working software — from campus tools to open-source side projects — alongside people who'll actually review your PRs."
+    hubBlurb: "Build and ship real, working software â€” from campus tools to open-source side projects â€” alongside people who'll actually review your PRs."
   },
   {
     id: "03",
@@ -31,7 +31,7 @@ const domainsData = [
     skills: ["Brand Strategy", "Social Growth", "SEO & Analytics", "Campaign Ops"],
     stats: "150k+ Audience Reach",
     color: "from-primary-magenta via-primary-bright to-primary",
-    hubBlurb: "Run real campaigns for real events — copy, content calendars, analytics, and the reporting that goes with it."
+    hubBlurb: "Run real campaigns for real events â€” copy, content calendars, analytics, and the reporting that goes with it."
   },
   {
     id: "04",
@@ -41,7 +41,7 @@ const domainsData = [
     skills: ["Cinematography", "Photo Operations", "VFX & Post-Production", "Event Media"],
     stats: "40+ Events Covered",
     color: "from-primary-deep via-primary-magenta to-primary-bright",
-    hubBlurb: "Shoot, edit, and cover every e-DAM event — camera work, video editing, and the after-effects that make a recap actually watchable."
+    hubBlurb: "Shoot, edit, and cover every e-DAM event â€” camera work, video editing, and the after-effects that make a recap actually watchable."
   }
 ];
 
@@ -136,7 +136,7 @@ export const Domains = () => {
 
                       <div className="pt-4 flex items-center gap-4">
                         <a
-                          href="#join"
+                          href="/contact"
                           className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-white text-black font-semibold text-sm hover:bg-white/90 transition-colors"
                         >
                           <span>Join {domain.title}</span>
@@ -165,3 +165,4 @@ export const Domains = () => {
     </section>
   );
 };
+
