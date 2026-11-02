@@ -10,10 +10,6 @@ export const directConnectionString =
   process.env.DIRECT_URL ||
   connectionString;
 
-if (!connectionString && process.env.NODE_ENV === "production") {
-  console.error("CRITICAL: DATABASE_URL is not configured in production environment!");
-}
-
 /**
  * Tagged template SQL client for executing parameterized queries against Neon.
  */

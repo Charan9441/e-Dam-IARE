@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 
@@ -72,14 +72,23 @@ function apiDevMiddleware(): Plugin {
 }
 
 // https://vite.dev/config/
-export default defineConfig({
-  plugins: [react(), apiDevMiddleware()],
-  resolve: {
-    alias: {
-      "@": path.resolve(import.meta.dirname, "./src"),
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), '');
+  for (const key in env) {
+    if (!process.env[key]) {
+      process.env[key] = env[key];
+    }
+  }
+
+  return {
+    plugins: [react(), apiDevMiddleware()],
+    resolve: {
+      alias: {
+        "@": path.resolve(import.meta.dirname, "./src"),
+      },
     },
-  },
-  server: {
-    host: true,
-  },
+    server: {
+      host: true,
+    },
+  };
 });

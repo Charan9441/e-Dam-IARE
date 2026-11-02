@@ -7,12 +7,20 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-export const R2_BUCKET_NAME = process.env.R2_BUCKET_NAME || "edam-iare-media";
+export function getR2BucketName(): string {
+  return process.env.R2_BUCKET_NAME || "edam-iare-media";
+}
+
+export function getR2Endpoint(): string {
+  const accountId = process.env.R2_ACCOUNT_ID || "";
+  return process.env.R2_ENDPOINT || (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : "");
+}
+
+export const R2_BUCKET_NAME = getR2BucketName();
 export const R2_ACCOUNT_ID = process.env.R2_ACCOUNT_ID || "";
 export const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID || "";
 export const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY || "";
-export const R2_ENDPOINT =
-  process.env.R2_ENDPOINT || (R2_ACCOUNT_ID ? `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com` : "");
+export const R2_ENDPOINT = getR2Endpoint();
 
 let s3ClientInstance: S3Client | null = null;
 
@@ -21,12 +29,16 @@ let s3ClientInstance: S3Client | null = null;
  */
 export function getR2Client(): S3Client {
   if (!s3ClientInstance) {
+    const endpoint = getR2Endpoint();
+    const accessKeyId = process.env.R2_ACCESS_KEY_ID || "";
+    const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || "";
+
     s3ClientInstance = new S3Client({
       region: "auto",
-      endpoint: R2_ENDPOINT,
+      endpoint,
       credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID,
-        secretAccessKey: R2_SECRET_ACCESS_KEY,
+        accessKeyId,
+        secretAccessKey,
       },
     });
   }
