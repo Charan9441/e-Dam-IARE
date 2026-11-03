@@ -37,16 +37,6 @@ sequenceDiagram
 
 ---
 
-## 2. Administrator Credentials
-
-| Role | Username | Email | Initial Password | Permissions |
-|---|---|---|---|---|
-| **Super Admin** | `admin` | `edam.iare@gmail.com` | `edam2026` *(or `edamiare2026admin`)* | Full event creation, form generation, certificate issuance, attendee records, and system telemetry |
-
-> [!TIP]
-> On the `/admin/login` page, the **"⚡ Instant Review: Launch Admin Console Directly"** button provides authorized administrators with one-click instant evaluation access without manual re-typing.
-
----
 
 ## 3. Session Management & RBAC
 
