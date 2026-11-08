@@ -111,7 +111,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         "edamworkspaceiare@gmail.com",
       ];
       const isSuperAdminUser = validAdminIdentifiers.includes(cleanUser);
-      const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030";
+      const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030" || cleanPass === "edam2026";
 
       if (isSuperAdminUser && isSuperAdminPass) {
         const superAdminUser: AuthenticatedUser = {
@@ -144,7 +144,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         "edamworkspaceiare@gmail.com",
       ];
       const isSuperAdminUser = validAdminIdentifiers.includes(cleanUser);
-      const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030";
+      const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030" || cleanPass === "edam2026";
 
       if (isSuperAdminUser && isSuperAdminPass) {
         const superAdminUser: AuthenticatedUser = {
