@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { sql } from "../../src/server/db";
+import { sql } from "../db";
 import {
   parseBody,
   sendJson,
@@ -7,9 +7,9 @@ import {
   requireAuth,
   applyCorsHeaders,
   getClientIp,
-} from "../../src/server/utils/api-handler";
+} from "../utils/api-handler";
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export async function handleRegistrations(req: IncomingMessage, res: ServerResponse) {
   applyCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -18,7 +18,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  // GET: Fetch registrations (Requires 'registrations:view')
+  // GET: Fetch registrations
   if (req.method === "GET") {
     const auth = await requireAuth(req, res, "registrations:view");
     if (!auth.authorized || !auth.user) {
@@ -57,7 +57,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
   }
 
-  // POST: Record registration (Requires 'registrations:manage')
+  // POST: Record registration
   if (req.method === "POST") {
     const auth = await requireAuth(req, res, "registrations:manage");
     if (!auth.authorized || !auth.user) {
@@ -118,3 +118,4 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
   return sendError(res, 405, "Method not allowed.");
 }
+

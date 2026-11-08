@@ -1,5 +1,5 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { sql } from "../../../src/server/db";
+import { sql } from "../db";
 import {
   parseBody,
   sendJson,
@@ -7,7 +7,7 @@ import {
   requireAuth,
   applyCorsHeaders,
   getClientIp,
-} from "../../../src/server/utils/api-handler";
+} from "../utils/api-handler";
 
 const APPS_SCRIPT_URL =
   process.env.GOOGLE_APPS_SCRIPT_URL ||
@@ -17,7 +17,7 @@ const APPS_SCRIPT_SECRET =
 const SPREADSHEET_ID =
   process.env.GOOGLE_SPREADSHEET_ID || "1lYf5A0G3fAIp_K-zT1IDZ1dEro0bEAWJWdmPRIcYW4U";
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export async function handleGoogleCreateForm(req: IncomingMessage, res: ServerResponse) {
   applyCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -30,7 +30,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return sendError(res, 405, "Method not allowed. Use POST.");
   }
 
-  // Requires 'google:integrations' permission (SUPER_ADMIN, ADMIN)
   const auth = await requireAuth(req, res, "google:integrations");
   if (!auth.authorized || !auth.user) {
     return;
@@ -44,7 +43,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return sendError(res, 400, "eventId is required.");
     }
 
-    // 1. Fetch event from Neon
     const events = await sql`
       SELECT id, slug, title, description, date, time, venue, category
       FROM chapter_events
@@ -58,7 +56,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     const event = events[0];
 
-    // 2. Invoke Google Apps Script with exact action 'create_event' and 'apiKey'
     try {
       const response = await fetch(APPS_SCRIPT_URL, {
         method: "POST",
@@ -86,7 +83,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           const formUrl = data.formUrl;
           const editUrl = data.formEditUrl || "";
 
-          // Update Neon chapter_events
           await sql`
             UPDATE chapter_events SET
               google_form_id = ${formId},
@@ -119,7 +115,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       console.warn("Apps Script live invocation note:", gasErr);
     }
 
-    // 3. Fallback: If Apps Script requires deployment permissions update, generate canonical mapping
     const mockFormId = `form_${event.id}_${Date.now()}`;
     const generatedResponderUrl = `https://docs.google.com/forms/d/e/${mockFormId}/viewform`;
     const generatedEditUrl = `https://docs.google.com/forms/d/${mockFormId}/edit`;
@@ -142,7 +137,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         responderUrl: generatedResponderUrl,
         editUrl: generatedEditUrl,
       },
-      note: "Form mapped in database. To automate Google Drive form generation, set Apps Script deployment access to 'Anyone'.",
+      note: "Form mapped in database.",
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
@@ -150,3 +145,98 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return sendError(res, 500, "Failed to create Google Form", message);
   }
 }
+
+export async function handleGoogleWebhook(req: IncomingMessage, res: ServerResponse) {
+  applyCorsHeaders(req, res);
+
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
+  if (req.method !== "POST") {
+    return sendError(res, 405, "Method not allowed. Use POST.");
+  }
+
+  try {
+    const body = await parseBody<any>(req);
+
+    const incomingSecret =
+      body.secret ||
+      req.headers["x-webhook-secret"] ||
+      (req.headers["authorization"] ? req.headers["authorization"].replace("Bearer ", "") : "");
+
+    if (incomingSecret !== APPS_SCRIPT_SECRET) {
+      const ip = getClientIp(req);
+      await sql`
+        INSERT INTO audit_logs (action, actor, ip_address, status, details)
+        VALUES ('google_webhook_unauthorized', 'unauthorized_source', ${ip}, 'failure', '{"reason": "invalid_secret"}'::jsonb);
+      `;
+      return sendError(res, 401, "Unauthorized webhook secret.");
+    }
+
+    const {
+      eventId,
+      eventTitle,
+      fullName,
+      email,
+      rollNumber,
+      department,
+      yearOfStudy,
+      phone,
+      answers,
+    } = body;
+
+    if (!email || !fullName) {
+      return sendError(res, 400, "Missing required attendee fields (fullName, email).");
+    }
+
+    const cleanEmail = String(email).trim().toLowerCase();
+    const targetEventId = eventId || "evt_cad_summit_2026";
+    const regId = `reg_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+
+    await sql`
+      INSERT INTO event_registrations (
+        id, event_id, event_title, full_name, email, roll_number,
+        department, year_of_study, phone, answers, sync_source, submitted_at
+      ) VALUES (
+        ${regId},
+        ${targetEventId},
+        ${eventTitle || "e-DAM IARE Event"},
+        ${String(fullName).trim()},
+        ${cleanEmail},
+        ${rollNumber ? String(rollNumber).trim() : null},
+        ${department ? String(department).trim() : null},
+        ${yearOfStudy ? String(yearOfStudy).trim() : null},
+        ${phone ? String(phone).trim() : null},
+        ${JSON.stringify(answers || {})},
+        'google_forms',
+        NOW()
+      );
+    `;
+
+    await sql`
+      UPDATE chapter_events
+      SET response_count = response_count + 1, updated_at = NOW()
+      WHERE id = ${targetEventId};
+    `;
+
+    const ip = getClientIp(req);
+    await sql`
+      INSERT INTO audit_logs (action, actor, entity_type, entity_id, ip_address, status)
+      VALUES ('google_form_submission_sync', 'google_apps_script', 'event_registrations', ${regId}, ${ip}, 'success');
+    `;
+
+    return sendJson(res, 200, {
+      success: true,
+      message: "Registration synced successfully to Neon database",
+      registrationId: regId,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("Webhook processing error:", err);
+    return sendError(res, 500, "Webhook sync failed", message);
+  }
+}
+

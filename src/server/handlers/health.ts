@@ -1,9 +1,9 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { getDatabaseHealth } from "../src/server/db";
-import { getR2Health } from "../src/server/storage/r2";
-import { sendJson, applyCorsHeaders } from "../src/server/utils/api-handler";
+import { getDatabaseHealth } from "../db";
+import { getR2Health } from "../storage/r2";
+import { sendJson, applyCorsHeaders } from "../utils/api-handler";
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export async function handleHealth(req: IncomingMessage, res: ServerResponse) {
   applyCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -36,3 +36,4 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     },
   });
 }
+

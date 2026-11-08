@@ -1,14 +1,14 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { StorageService } from "../../src/server/storage/storage.service";
+import { StorageService } from "../storage/storage.service";
 import {
   parseBody,
   sendJson,
   sendError,
   requireAuth,
   applyCorsHeaders,
-} from "../../src/server/utils/api-handler";
+} from "../utils/api-handler";
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export async function handlePresignedUrl(req: IncomingMessage, res: ServerResponse) {
   applyCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -21,7 +21,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return sendError(res, 405, "Method not allowed. Use POST.");
   }
 
-  // Requires 'uploads:manage' permission (SUPER_ADMIN, ADMIN, EDITOR)
   const auth = await requireAuth(req, res, "uploads:manage");
   if (!auth.authorized || !auth.user) {
     return;
@@ -50,7 +49,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       category,
       filename,
       contentType,
-      900 // 15 mins
+      900
     );
 
     return sendJson(res, 200, {
@@ -65,3 +64,4 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return sendError(res, 500, "Failed to create presigned upload URL", message);
   }
 }
+

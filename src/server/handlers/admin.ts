@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { sql } from "../../src/server/db";
-import { AuthService } from "../../src/server/auth/auth.service";
-import { normalizeRole } from "../../src/server/auth/rbac";
+import { sql } from "../db";
+import { AuthService } from "../auth/auth.service";
+import { normalizeRole } from "../auth/rbac";
 import {
   parseBody,
   sendJson,
@@ -9,9 +9,9 @@ import {
   requireAuth,
   applyCorsHeaders,
   getClientIp,
-} from "../../src/server/utils/api-handler";
+} from "../utils/api-handler";
 
-export default async function handler(req: IncomingMessage, res: ServerResponse) {
+export async function handleAdminAuditLogs(req: IncomingMessage, res: ServerResponse) {
   applyCorsHeaders(req, res);
 
   if (req.method === "OPTIONS") {
@@ -20,13 +20,52 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     return;
   }
 
-  // Requires 'users:manage' (SUPER_ADMIN only)
+  const auth = await requireAuth(req, res, "audit:view");
+  if (!auth.authorized || !auth.user) {
+    return;
+  }
+
+  if (req.method !== "GET") {
+    return sendError(res, 405, "Method not allowed. Use GET.");
+  }
+
+  try {
+    const url = new URL(req.url || "", `http://${req.headers.host || "localhost"}`);
+    const limit = Math.min(Number(url.searchParams.get("limit") || 100), 250);
+
+    const logs = await sql`
+      SELECT id, action, actor, actor_role, entity_type, entity_id, ip_address, status, details, created_at
+      FROM audit_logs
+      ORDER BY created_at DESC
+      LIMIT ${limit};
+    `;
+
+    return sendJson(res, 200, {
+      success: true,
+      count: logs.length,
+      logs,
+    });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return sendError(res, 500, "Failed to retrieve audit logs", message);
+  }
+}
+
+export async function handleAdminUsers(req: IncomingMessage, res: ServerResponse) {
+  applyCorsHeaders(req, res);
+
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    res.end();
+    return;
+  }
+
   const auth = await requireAuth(req, res, "users:manage");
   if (!auth.authorized || !auth.user) {
     return;
   }
 
-  // GET: List all administrators (never return password_hash!)
+  // GET: List all administrators
   if (req.method === "GET") {
     try {
       const users = await sql`
@@ -60,7 +99,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         return sendError(res, 400, "Username and email are required.");
       }
 
-      // Check if user already exists
       const existing = await sql`
         SELECT id FROM admin_users
         WHERE LOWER(username) = ${username} OR LOWER(email) = ${email}
@@ -70,7 +108,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const ip = getClientIp(req);
 
       if (existing.length > 0) {
-        // Update role and name
         const userId = existing[0].id;
         await sql`
           UPDATE admin_users
@@ -89,7 +126,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         });
       }
 
-      // Creating a new administrator requires an initial password
       if (!password || password.length < 8) {
         return sendError(res, 400, "A secure password of at least 8 characters is required for new users.");
       }

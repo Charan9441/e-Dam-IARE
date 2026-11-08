@@ -7,7 +7,7 @@ function apiDevMiddleware(): Plugin {
     name: 'api-dev-middleware',
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
-        if (!req.url?.startsWith('/api/')) {
+        if (!req.url?.startsWith('/api/') && req.url !== '/api') {
           return next();
         }
 
@@ -29,31 +29,10 @@ function apiDevMiddleware(): Plugin {
               (req as any).body = {};
             }
 
-            const url = new URL(req.url || '', `http://${req.headers.host || 'localhost'}`);
-            const pathname = url.pathname;
-
-            let filePath = '';
-            if (pathname === '/api/health') filePath = '/api/health.ts';
-            else if (pathname === '/api/auth/login') filePath = '/api/auth/login.ts';
-            else if (pathname === '/api/auth/logout') filePath = '/api/auth/logout.ts';
-            else if (pathname === '/api/auth/me') filePath = '/api/auth/me.ts';
-            else if (pathname === '/api/events') filePath = '/api/events/index.ts';
-            else if (pathname.startsWith('/api/events/')) filePath = '/api/events/[slug].ts';
-            else if (pathname === '/api/registrations') filePath = '/api/registrations/index.ts';
-            else if (pathname === '/api/certificates') filePath = '/api/certificates/index.ts';
-            else if (pathname.startsWith('/api/certificates/verify/')) filePath = '/api/certificates/verify/[id].ts';
-            else if (pathname === '/api/uploads/presigned-url') filePath = '/api/uploads/presigned-url.ts';
-            else if (pathname === '/api/integrations/google/create-form') filePath = '/api/integrations/google/create-form.ts';
-            else if (pathname === '/api/integrations/google/webhook') filePath = '/api/integrations/google/webhook.ts';
-            else if (pathname === '/api/admin/audit-logs') filePath = '/api/admin/audit-logs.ts';
-            else if (pathname === '/api/admin/users') filePath = '/api/admin/users.ts';
-
-            if (filePath) {
-              const absolutePath = path.resolve(server.config.root, '.' + filePath);
-              const module = await server.ssrLoadModule(absolutePath);
-              if (typeof module.default === 'function') {
-                return await module.default(req, res);
-              }
+            const absolutePath = path.resolve(server.config.root, './api/index.ts');
+            const module = await server.ssrLoadModule(absolutePath);
+            if (typeof module.default === 'function') {
+              return await module.default(req, res);
             }
 
             res.statusCode = 404;

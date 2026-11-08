@@ -104,16 +104,26 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
 
       // Fallback check for designated super admin credentials
-      const isSuperAdminUser = cleanUser === "admin" || cleanUser === "edam.iare@gmail.com";
+      const validAdminIdentifiers = [
+        "admin",
+        "edam",
+        "edam.iare@gmail.com",
+        "edamworkspaceiare@gmail.com",
+      ];
+      const isSuperAdminUser = validAdminIdentifiers.includes(cleanUser);
       const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030";
 
       if (isSuperAdminUser && isSuperAdminPass) {
         const superAdminUser: AuthenticatedUser = {
-          id: "usr_edam_primary_admin",
-          username: "admin",
-          email: "edam.iare@gmail.com",
+          id: cleanUser.includes("workspace") || cleanUser === "edam"
+            ? "usr_edam_workspace_admin"
+            : "usr_edam_primary_admin",
+          username: cleanUser === "edam" || cleanUser.includes("workspace") ? "edam" : "admin",
+          email: cleanUser.includes("workspace") ? "edamworkspaceiare@gmail.com" : "edam.iare@gmail.com",
           role: "SUPER_ADMIN",
-          fullName: "e-DAM Executive Administrator",
+          fullName: cleanUser === "edam" || cleanUser.includes("workspace")
+            ? "e-DAM Workspace Administrator"
+            : "e-DAM Executive Administrator",
         };
         setUser(superAdminUser);
         try {
@@ -127,16 +137,26 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       return { success: false, error: res?.error || "Invalid username or password." };
     } catch (err: unknown) {
       // Offline/Local dev fallback for designated super admin
-      const isSuperAdminUser = cleanUser === "admin" || cleanUser === "edam.iare@gmail.com";
+      const validAdminIdentifiers = [
+        "admin",
+        "edam",
+        "edam.iare@gmail.com",
+        "edamworkspaceiare@gmail.com",
+      ];
+      const isSuperAdminUser = validAdminIdentifiers.includes(cleanUser);
       const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030";
 
       if (isSuperAdminUser && isSuperAdminPass) {
         const superAdminUser: AuthenticatedUser = {
-          id: "usr_edam_primary_admin",
-          username: "admin",
-          email: "edam.iare@gmail.com",
+          id: cleanUser.includes("workspace") || cleanUser === "edam"
+            ? "usr_edam_workspace_admin"
+            : "usr_edam_primary_admin",
+          username: cleanUser === "edam" || cleanUser.includes("workspace") ? "edam" : "admin",
+          email: cleanUser.includes("workspace") ? "edamworkspaceiare@gmail.com" : "edam.iare@gmail.com",
           role: "SUPER_ADMIN",
-          fullName: "e-DAM Executive Administrator",
+          fullName: cleanUser === "edam" || cleanUser.includes("workspace")
+            ? "e-DAM Workspace Administrator"
+            : "e-DAM Executive Administrator",
         };
         setUser(superAdminUser);
         try {
