@@ -2,8 +2,8 @@
  * e-DAM IARE - Google Apps Script Automation Backend
  * Handles Automated Event Management, Google Forms Creation & Response Sync.
  *
- * Configured API Key:
- * edam_iare_apps_script_key_2026
+ * Security Configuration:
+ * Configure API_KEY and VERCEL_WEBHOOK_URL strictly in Script Properties.
  *
  * Quick Setup:
  * 1. Open your Google Sheet -> Extensions -> Apps Script.
@@ -19,8 +19,10 @@
 // ============================================================================
 // CONFIGURATION & CREDENTIALS
 // ============================================================================
-// Shared Secret API Key between the Next.js server and Google Apps Script
-var API_KEY = "edam_iare_apps_script_key_2026";
+// Shared Secret API Key loaded strictly from Apps Script Properties
+function getConfiguredApiKey() {
+  return PropertiesService.getScriptProperties().getProperty("API_KEY") || "";
+}
 
 // Required Sheet Tab Names
 var EVENTS_SHEET_NAME = "Events";
@@ -38,7 +40,6 @@ var FORM_CONFIGURATIONS_SHEET_NAME = "FormConfigurations";
  */
 function setupAll() {
   var ss = getOrCreateSpreadsheet();
-  PropertiesService.getScriptProperties().setProperty("API_KEY", API_KEY);
   PropertiesService.getScriptProperties().setProperty("SPREADSHEET_ID", ss.getId());
 
   setupInstallableTrigger();
@@ -46,7 +47,7 @@ function setupAll() {
   Logger.log("=== e-DAM IARE SETUP SUCCESSFUL ===");
   Logger.log("Spreadsheet ID: " + ss.getId());
   Logger.log("Spreadsheet URL: " + ss.getUrl());
-  Logger.log("API_KEY configured: " + API_KEY);
+  Logger.log("API_KEY configured in Script Properties: " + Boolean(getConfiguredApiKey()));
   Logger.log("All 5 tabs verified: Events, FormRegistry, Registrations, AuditLog, FormConfigurations");
 }
 
@@ -68,8 +69,8 @@ function doPost(e) {
     var payload = data.payload || {};
 
     // Validate API Secret against Script Properties or default constant
-    var expectedApiKey = PropertiesService.getScriptProperties().getProperty("API_KEY") || API_KEY;
-    if (requestApiKey !== expectedApiKey) {
+    var expectedApiKey = getConfiguredApiKey();
+    if (!expectedApiKey || requestApiKey !== expectedApiKey) {
       return createJsonResponse({ success: false, error: "Unauthorized: Invalid API Key" }, 401);
     }
 
@@ -940,13 +941,14 @@ function onFormSubmit(e) {
 
         // Dispatch real-time webhook to Vercel backend if configured
     var webhookUrl = PropertiesService.getScriptProperties().getProperty("VERCEL_WEBHOOK_URL");
-    if (webhookUrl) {
+    var webhookSecret = getConfiguredApiKey();
+    if (webhookUrl && webhookSecret) {
       try {
         UrlFetchApp.fetch(webhookUrl, {
           method: "post",
           contentType: "application/json",
+          headers: { "X-Webhook-Secret": webhookSecret },
           payload: JSON.stringify({
-            secret: API_KEY,
             eventId: eventId,
             fullName: attendeeName,
             email: email,

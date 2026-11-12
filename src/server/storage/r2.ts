@@ -8,7 +8,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export function getR2BucketName(): string {
-  return process.env.R2_BUCKET_NAME || "edam-iare-media";
+  return (process.env.R2_BUCKET_NAME || "").trim();
 }
 
 export function getR2Endpoint(): string {
@@ -32,6 +32,11 @@ export function getR2Client(): S3Client {
     const endpoint = getR2Endpoint();
     const accessKeyId = process.env.R2_ACCESS_KEY_ID || "";
     const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY || "";
+    const bucket = getR2BucketName();
+
+    if (!endpoint || !accessKeyId || !secretAccessKey || !bucket) {
+      throw new Error("Cloudflare R2 credentials are not fully configured.");
+    }
 
     s3ClientInstance = new S3Client({
       region: "auto",
@@ -50,24 +55,22 @@ export function getR2Client(): S3Client {
  */
 export async function getR2Health(): Promise<{
   connected: boolean;
-  bucket: string;
   latencyMs: number;
   error?: string;
 }> {
   const start = Date.now();
   try {
+    const bucket = getR2BucketName();
     const client = getR2Client();
-    await client.send(new HeadBucketCommand({ Bucket: R2_BUCKET_NAME }));
+    await client.send(new HeadBucketCommand({ Bucket: bucket }));
     return {
       connected: true,
-      bucket: R2_BUCKET_NAME,
       latencyMs: Date.now() - start,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err);
     return {
       connected: false,
-      bucket: R2_BUCKET_NAME,
       latencyMs: Date.now() - start,
       error: message,
     };

@@ -12,13 +12,24 @@ function apiDevMiddleware(): Plugin {
         }
 
         const chunks: Buffer[] = [];
+        let totalBytes = 0;
         req.on('data', (chunk) => {
-          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+          const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+          totalBytes += buf.length;
+          if (totalBytes <= 1024 * 1024) {
+            chunks.push(buf);
+          }
         });
 
         req.on('end', async () => {
           try {
             const rawBody = Buffer.concat(chunks).toString('utf8');
+            if (totalBytes > 1024 * 1024) {
+              res.statusCode = 413;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ success: false, error: 'Payload too large' }));
+              return;
+            }
             if (rawBody) {
               try {
                 (req as any).body = JSON.parse(rawBody);
@@ -42,7 +53,7 @@ function apiDevMiddleware(): Plugin {
             console.error('[API Dev Server Error]:', err);
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
-            res.end(JSON.stringify({ success: false, error: 'Internal API Server Error', details: String(err) }));
+            res.end(JSON.stringify({ success: false, error: 'Internal API Server Error', details: null }));
           }
         });
       });

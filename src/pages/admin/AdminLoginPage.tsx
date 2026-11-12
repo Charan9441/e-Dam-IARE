@@ -5,6 +5,14 @@ import { EdamLogo } from "@/components/EdamLogo";
 import { useAdminAuth } from "@/context/AdminAuthContext";
 import { Button } from "@/components/ui/Button";
 
+function getSafeAdminRedirect(state: unknown): string {
+  const fromPath = (state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  if (typeof fromPath === "string" && fromPath.startsWith("/admin") && !fromPath.startsWith("//")) {
+    return fromPath;
+  }
+  return "/admin";
+}
+
 export const AdminLoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -19,8 +27,7 @@ export const AdminLoginPage: React.FC = () => {
   // If already authenticated by server session, redirect directly to admin console
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      const destination = (location.state as any)?.from?.pathname || "/admin";
-      navigate(destination, { replace: true });
+      navigate(getSafeAdminRedirect(location.state), { replace: true });
     }
   }, [isAuthenticated, isLoading, navigate, location]);
 
@@ -40,8 +47,7 @@ export const AdminLoginPage: React.FC = () => {
     try {
       const res = await login(cleanUser, cleanPass);
       if (res.success) {
-        const destination = (location.state as any)?.from?.pathname || "/admin";
-        navigate(destination, { replace: true });
+        navigate(getSafeAdminRedirect(location.state), { replace: true });
       } else {
         setError(res.error || "Invalid username or password.");
       }

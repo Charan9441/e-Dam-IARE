@@ -1,12 +1,12 @@
 import {
   getR2Client,
-  R2_BUCKET_NAME,
+  getR2BucketName,
   PutObjectCommand,
   GetObjectCommand,
   DeleteObjectCommand,
   getSignedUrl,
-} from "./r2";
-import { sql } from "../db";
+} from "./r2.ts";
+import { sql } from "../db/index.ts";
 
 export interface StorageUploadOptions {
   fileName?: string;
@@ -27,7 +27,6 @@ const ALLOWED_CONTENT_TYPES = [
   "image/jpeg",
   "image/png",
   "image/webp",
-  "image/svg+xml",
 ];
 
 const MAX_BANNER_SIZE = 5 * 1024 * 1024; // 5MB
@@ -81,8 +80,9 @@ export class StorageService {
       throw new Error(`File size (${size} bytes) exceeds the allowed limit.`);
     }
 
+    const bucket = getR2BucketName();
     const command = new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: bucket,
       Key: storageKey,
       Body: buffer,
       ContentType: contentType,
@@ -100,7 +100,7 @@ export class StorageService {
         ) VALUES (
           ${fileId},
           ${storageKey},
-          ${R2_BUCKET_NAME},
+          ${bucket},
           ${options.fileName || storageKey.split("/").pop() || "file"},
           ${contentType},
           ${size},
@@ -140,8 +140,9 @@ export class StorageService {
     const storageKey = this.generateStorageKey(category, filename);
     const client = getR2Client();
 
+    const bucket = getR2BucketName();
     const command = new PutObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: bucket,
       Key: storageKey,
       ContentType: contentType,
     });
@@ -164,7 +165,7 @@ export class StorageService {
   ): Promise<string> {
     const client = getR2Client();
     const command = new GetObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: getR2BucketName(),
       Key: storageKey,
     });
 
@@ -177,7 +178,7 @@ export class StorageService {
   static async deleteObject(storageKey: string): Promise<boolean> {
     const client = getR2Client();
     const command = new DeleteObjectCommand({
-      Bucket: R2_BUCKET_NAME,
+      Bucket: getR2BucketName(),
       Key: storageKey,
     });
 

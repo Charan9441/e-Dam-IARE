@@ -3,6 +3,7 @@ import { X, CheckCircle2, Calendar, MapPin, ExternalLink, Sparkles, AlertCircle 
 import type { ChapterEvent } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { registerAttendee } from "@/lib/edam-store";
+import { safeExternalHttpUrl } from "@/lib/utils";
 
 interface EventRegistrationModalProps {
   event: ChapterEvent;
@@ -30,6 +31,8 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const safeGoogleFormUrl = safeExternalHttpUrl(event.googleFormUrl);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -121,14 +124,14 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
             </div>
 
             {/* External Google Form Notice if linked */}
-            {event.googleFormUrl && (
+            {safeGoogleFormUrl && (
               <div className="mb-6 p-4 rounded-xl bg-purple-950/40 border border-purple-500/30 flex items-center justify-between gap-4">
                 <div className="text-xs text-purple-200">
                   <p className="font-semibold text-white">Official Google Form Available</p>
                   <p className="text-purple-300/80">You can also register directly on the official Google Form.</p>
                 </div>
                 <a
-                  href={event.googleFormUrl}
+                  href={safeGoogleFormUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#8B5CF6] hover:bg-[#7C3AED] text-white text-xs font-semibold transition-colors"
@@ -198,7 +201,7 @@ export const EventRegistrationModal: React.FC<EventRegistrationModalProps> = ({
                   </label>
                   <input
                     type="tel"
-                    placeholder="e.g. +91 9876543210"
+                    placeholder="e.g. +91 00000 00000"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                     className="w-full px-3.5 py-2.5 rounded-lg bg-white/5 border border-white/10 focus:border-[#8B5CF6] focus:outline-none text-sm text-[#F5F3FF] placeholder:text-white/20 transition-colors"

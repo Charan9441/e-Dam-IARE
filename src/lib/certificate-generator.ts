@@ -17,13 +17,17 @@ export interface GenerateCertOptions {
 }
 
 /**
- * Generates an alphanumeric secure credential ID for e-DAM
+ * Generates a cryptographically random alphanumeric credential ID for e-DAM
  */
 export function generateCertificateNumber(prefix = "EDAM-IARE-2026"): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const bytes = new Uint8Array(6);
+  if (typeof globalThis.crypto !== "undefined" && globalThis.crypto.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  }
   let random = "";
-  for (let i = 0; i < 4; i++) {
-    random += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < 6; i++) {
+    random += chars.charAt(bytes[i] % chars.length);
   }
   return `${prefix}-${random}`;
 }
@@ -233,7 +237,11 @@ export async function renderCertificatePdf(params: GenerateCertOptions): Promise
   });
 
   // 9. QR Code Verification Generation
-  const verificationUrl = `https://edam.iare.ac.in/verify/${encodeURIComponent(params.certificateNumber)}`;
+  const verifyOrigin =
+    typeof window !== "undefined" && window.location?.origin
+      ? window.location.origin
+      : "https://e-dam-iare.vercel.app";
+  const verificationUrl = `${verifyOrigin}/verify/${encodeURIComponent(params.certificateNumber)}`;
   const qrDataUrl = await QRCode.toDataURL(verificationUrl, {
     margin: 1,
     width: 256,
@@ -242,7 +250,12 @@ export async function renderCertificatePdf(params: GenerateCertOptions): Promise
       light: "#FFFFFF",
     },
   });
-  const qrImageBytes = Buffer.from(qrDataUrl.split(",")[1], "base64");
+  const base64Data = qrDataUrl.split(",")[1] || "";
+  const binaryString = atob(base64Data);
+  const qrImageBytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    qrImageBytes[i] = binaryString.charCodeAt(i);
+  }
   const qrImage = await pdfDoc.embedPng(qrImageBytes);
   
   const qrSize = 65;

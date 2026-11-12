@@ -1,7 +1,8 @@
-﻿import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Search, Calendar } from "lucide-react";
 import type { ChapterEvent } from "@/types";
-import { getStoredEvents } from "@/lib/edam-store";
+import { getStoredEvents, mapApiEvent } from "@/lib/edam-store";
+import { ApiClient } from "@/lib/api-client";
 import { EventCard } from "@/components/events/EventCard";
 
 
@@ -12,9 +13,25 @@ export const EventsPage: React.FC = () => {
   const [selectedTab, setSelectedTab] = useState<FilterTab>("All");
   const [searchQuery, setSearchQuery] = useState("");
 
-  const refreshEvents = () => {
-    setEvents(getStoredEvents());
-  };
+  const refreshEvents = useCallback(async () => {
+    const localEvents = getStoredEvents();
+    const res = await ApiClient.getEvents();
+    if (res.success && Array.isArray(res.events) && res.events.length > 0) {
+      const apiMapped = res.events.map(mapApiEvent);
+      const seen = new Set(apiMapped.map((e: ChapterEvent) => e.slug));
+      const merged = [
+        ...apiMapped,
+        ...localEvents.filter((e) => !seen.has(e.slug)),
+      ];
+      setEvents(merged);
+      return;
+    }
+    setEvents(localEvents);
+  }, []);
+
+  useEffect(() => {
+    refreshEvents();
+  }, [refreshEvents]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {

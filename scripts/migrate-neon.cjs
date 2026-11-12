@@ -216,27 +216,45 @@ async function run() {
   `;
   console.log("✓ audit_logs table verified.");
 
-  // 9. Seed default admin user if not exists
-  console.log("\n9. Checking default administrator...");
-  const adminCheck = await sql`SELECT count(*) FROM admin_users WHERE username = 'admin'`;
+  // 8b. api_rate_limits
+  console.log("8b. Migrating api_rate_limits table...");
+  await sql`
+    CREATE TABLE IF NOT EXISTS api_rate_limits (
+      rate_key VARCHAR(255) PRIMARY KEY,
+      hit_count INT NOT NULL DEFAULT 1,
+      window_start TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `;
+  await sql`CREATE INDEX IF NOT EXISTS idx_rate_limits_window ON api_rate_limits(window_start);`;
+  console.log("✓ api_rate_limits table verified.");
+
+  // 9. Check initial administrator provisioning (never create a hardcoded default account)
+  console.log("\n9. Checking initial administrator...");
+  const adminCheck = await sql`SELECT count(*) FROM admin_users WHERE role = 'SUPER_ADMIN'`;
   if (Number(adminCheck[0]?.count || 0) === 0) {
-    const salt = await bcrypt.genSalt(10);
-    const passHash = await bcrypt.hash('edam2026', salt);
-    await sql`
-      INSERT INTO admin_users (id, username, email, password_hash, role, full_name, is_active)
-      VALUES (
-        'usr_edam_primary_admin',
-        'admin',
-        'edam.iare@gmail.com',
-        ${passHash},
-        'super_admin',
-        'e-DAM Executive Administrator',
-        true
-      );
-    `;
-    console.log("✓ Seeded primary administrator (username: admin, pass: edam2026)");
+    const initialPass = process.env.ADMIN_INITIAL_PASSWORD;
+    if (initialPass && initialPass.length >= 12) {
+      const salt = await bcrypt.genSalt(12);
+      const passHash = await bcrypt.hash(initialPass, salt);
+      await sql`
+        INSERT INTO admin_users (id, username, email, password_hash, role, full_name, is_active, password_changed_at)
+        VALUES (
+          'usr_edam_primary_admin',
+          'admin',
+          'edam.iare@gmail.com',
+          ${passHash},
+          'SUPER_ADMIN',
+          'e-DAM Executive Administrator',
+          true,
+          NOW()
+        );
+      `;
+      console.log("✓ Provisioned initial SUPER_ADMIN from ADMIN_INITIAL_PASSWORD environment variable.");
+    } else {
+      console.log("ℹ No SUPER_ADMIN seeded automatically. Run 'node scripts/provision-admin.cjs' to provision securely.");
+    }
   } else {
-    console.log("✓ Primary administrator already exists.");
+    console.log("✓ Super administrator account already exists.");
   }
 
   // 10. Seed default certificate templates if not exists

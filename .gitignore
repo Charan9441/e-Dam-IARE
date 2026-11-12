@@ -15,8 +15,24 @@ dist-ssr
 .env.*
 !.env.example
 
+# Sensitive Keys, Credentials, Local DBs & Deployment Metadata
+*.pem
+*.key
+*.crt
+*.cer
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.secret*
+*.sqlite
+*.sqlite3
+*.db
+.vercel
+
 # Temporary and Scratch
 scratch/
+coverage/
 *.tmp
 
 # Agent & Dev Tooling Artifacts

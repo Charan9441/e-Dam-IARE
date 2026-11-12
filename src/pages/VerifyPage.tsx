@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   ShieldCheck,
@@ -6,8 +6,9 @@ import {
   Search,
   Hash,
   Download,
+  Loader2,
 } from "lucide-react";
-import { findCertificateById } from "@/lib/edam-store";
+import { findCertificateById, mapApiCertificate } from "@/lib/edam-store";
 import { ApiClient } from "@/lib/api-client";
 import type { IssuedCertificate } from "@/types";
 import { renderCertificatePdf, downloadCertificateBuffer } from "@/lib/certificate-generator";
@@ -20,54 +21,48 @@ export const VerifyPage: React.FC = () => {
   const [cert, setCert] = useState<IssuedCertificate | undefined>(() =>
     certId ? findCertificateById(certId) : undefined
   );
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadSuccess, setDownloadSuccess] = useState(false);
 
-  const fetchCertificate = async (id: string) => {
+  const fetchCertificate = useCallback(async (id: string) => {
     const trimmed = id.trim();
     if (!trimmed) return;
     setSearchedId(trimmed);
+    setIsVerifying(true);
+    setVerifyError(null);
 
-    // Check local store first
-    const local = findCertificateById(trimmed);
-    if (local) {
-      setCert(local);
-      return;
-    }
-
-    // Check remote Neon API
     try {
+      // Query authoritative server ledger first
       const res = await ApiClient.verifyCertificate(trimmed);
       if (res && res.success && res.certificate) {
-        setCert({
-          id: res.certificate.certificateNumber,
-          certificateNumber: res.certificate.certificateNumber,
-          recipientName: res.certificate.recipientName,
-          recipientEmail: res.certificate.recipientEmail,
-          recipientRollNumber: res.certificate.rollNumber,
-          recipientDepartment: res.certificate.department,
-          eventId: "edam-event",
-          eventTitle: res.certificate.eventTitle,
-          eventDate: res.certificate.eventDate,
-          certificateType: (res.certificate.type || "participation") as any,
-          status: res.certificate.status || "valid",
-          issuedAt: res.certificate.issuedAt,
-          issuedBy: "e-DAM Executive Council",
-          verificationCode: res.certificate.certificateNumber,
-        });
+        setCert(mapApiCertificate(res.certificate));
         return;
       }
-    } catch (_) {}
 
-    setCert(undefined);
-  };
+      if (res?.status === 429) {
+        setVerifyError(res.error || "Too many verification attempts. Please try again shortly.");
+        setCert(undefined);
+        return;
+      }
+    } catch {
+      // Fall through cleanly to showcase sample lookup
+    } finally {
+      setIsVerifying(false);
+    }
+
+    // Fallback to showcase credential samples when record is not in remote ledger
+    const local = findCertificateById(trimmed);
+    setCert(local);
+  }, []);
 
   useEffect(() => {
     if (certId) {
       setSearchInput(certId);
       fetchCertificate(certId);
     }
-  }, [certId]);
+  }, [certId, fetchCertificate]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -76,7 +71,7 @@ export const VerifyPage: React.FC = () => {
   };
 
   const handleDownloadPdf = async () => {
-    if (!cert) return;
+    if (!cert || cert.status !== "valid") return;
     setIsDownloading(true);
     setDownloadSuccess(false);
 
@@ -102,6 +97,8 @@ export const VerifyPage: React.FC = () => {
       setIsDownloading(false);
     }
   };
+
+  const isValid = cert?.status === "valid";
 
   return (
     <div className="min-h-screen bg-[#030305] text-[#F5F3FF] pt-28 pb-20">
@@ -133,7 +130,7 @@ export const VerifyPage: React.FC = () => {
                 className="w-full pl-11 pr-4 py-3 rounded-xl bg-white/5 border border-white/10 focus:border-[#8B5CF6] focus:outline-none text-sm text-[#F5F3FF] placeholder:text-white/30 uppercase font-mono transition-colors"
               />
             </div>
-            <Button type="submit" variant="primary" size="md">
+            <Button type="submit" variant="primary" size="md" isLoading={isVerifying}>
               <Search className="w-4 h-4" />
               <span>Verify Now</span>
             </Button>
@@ -147,10 +144,9 @@ export const VerifyPage: React.FC = () => {
                 type="button"
                 onClick={() => {
                   setSearchInput(id);
-                  setSearchedId(id);
-                  setCert(findCertificateById(id));
+                  fetchCertificate(id);
                 }}
-                className="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[#C4B5FD] font-mono hover:text-white transition-colors"
+                className="px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 text-[#C4B5FD] font-mono hover:text-white transition-colors cursor-pointer"
               >
                 {id}
               </button>
@@ -160,40 +156,76 @@ export const VerifyPage: React.FC = () => {
 
         {searchedId && (
           <div>
-            {cert ? (
-              <div className="rounded-3xl bg-[#0B0614] border border-emerald-500/40 p-6 sm:p-10 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
+            {isVerifying ? (
+              <div className="rounded-3xl bg-[#0B0614] border border-[#8B5CF6]/30 p-10 text-center space-y-3 shadow-xl">
+                <Loader2 className="w-8 h-8 animate-spin text-[#8B5CF6] mx-auto" />
+                <p className="text-sm text-[#928A9F]">Verifying credential against the central e-DAM ledger...</p>
+              </div>
+            ) : cert ? (
+              <div
+                className={`rounded-3xl bg-[#0B0614] p-6 sm:p-10 shadow-2xl relative overflow-hidden border ${
+                  isValid ? "border-emerald-500/40" : "border-rose-500/40"
+                }`}
+              >
+                <div
+                  className={`absolute top-0 right-0 w-64 h-64 rounded-full blur-[80px] pointer-events-none ${
+                    isValid ? "bg-emerald-500/10" : "bg-rose-500/10"
+                  }`}
+                />
 
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/10">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
-                      <ShieldCheck className="w-6 h-6" />
+                    <div
+                      className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border ${
+                        isValid
+                          ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                          : "bg-rose-500/20 border-rose-500/40 text-rose-400"
+                      }`}
+                    >
+                      {isValid ? <ShieldCheck className="w-6 h-6" /> : <ShieldAlert className="w-6 h-6" />}
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-emerald-400 font-bold text-sm tracking-wide uppercase">
-                          ● Official Valid Credential
+                        <span
+                          className={`font-bold text-sm tracking-wide uppercase ${
+                            isValid ? "text-emerald-400" : "text-rose-400"
+                          }`}
+                        >
+                          {isValid ? "● Official Valid Credential" : "● Credential Revoked"}
                         </span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-white/5 text-white/60">
                           {cert.certificateNumber}
                         </span>
                       </div>
                       <h2 className="text-2xl font-bold font-heading text-white">
-                        Authenticated Record
+                        {isValid ? "Authenticated Record" : "Revoked Credential Record"}
                       </h2>
                     </div>
                   </div>
 
-                  <Button
-                    variant="primary"
-                    size="md"
-                    onClick={handleDownloadPdf}
-                    isLoading={isDownloading}
-                  >
-                    <Download className="w-4 h-4" />
-                    <span>{downloadSuccess ? "Downloaded!" : "Download Official PDF"}</span>
-                  </Button>
+                  {isValid ? (
+                    <Button
+                      variant="primary"
+                      size="md"
+                      onClick={handleDownloadPdf}
+                      isLoading={isDownloading}
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>{downloadSuccess ? "Downloaded!" : "Download Official PDF"}</span>
+                    </Button>
+                  ) : (
+                    <span className="px-3.5 py-2 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold">
+                      Download Disabled
+                    </span>
+                  )}
                 </div>
+
+                {!isValid && (
+                  <div className="mt-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-xs text-rose-200">
+                    This credential was revoked by the e-DAM IARE Executive Council
+                    {cert.revokedReason ? `: ${cert.revokedReason}` : "."}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 py-8">
                   <div>
@@ -255,7 +287,9 @@ export const VerifyPage: React.FC = () => {
                   <p>
                     Verified against the Institute of Aeronautical Engineering e-DAM central cryptographic ledger.
                   </p>
-                  <span className="font-mono text-emerald-400">STATUS: ACTIVE &amp; ACCREDITED</span>
+                  <span className={`font-mono ${isValid ? "text-emerald-400" : "text-rose-400"}`}>
+                    {isValid ? "STATUS: ACTIVE & ACCREDITED" : "STATUS: REVOKED"}
+                  </span>
                 </div>
               </div>
             ) : (
@@ -264,10 +298,16 @@ export const VerifyPage: React.FC = () => {
                   <ShieldAlert className="w-7 h-7" />
                 </div>
                 <h3 className="text-2xl font-bold font-heading text-white">
-                  Credential Not Found
+                  {verifyError ? "Verification Temporarily Rate-Limited" : "Credential Not Found"}
                 </h3>
                 <p className="text-sm text-[#928A9F] max-w-md mx-auto">
-                  We could not find any active certificate matching <span className="text-rose-300 font-mono font-semibold">{searchedId}</span> in the e-DAM database. Please verify the ID on your certificate.
+                  {verifyError || (
+                    <>
+                      We could not find any active certificate matching{" "}
+                      <span className="text-rose-300 font-mono font-semibold">{searchedId}</span> in the e-DAM database.
+                      Please verify the ID on your certificate.
+                    </>
+                  )}
                 </p>
                 <div className="pt-2">
                   <Link to="/contact" className="text-xs text-[#8B5CF6] hover:underline font-semibold">

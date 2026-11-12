@@ -1,6 +1,6 @@
 import type { IncomingMessage, ServerResponse } from "http";
-import { AuthService, type AuthenticatedUser } from "../auth/auth.service";
-import type { Permission } from "../auth/rbac";
+import { AuthService, type AuthenticatedUser } from "../auth/auth.service.ts";
+import type { Permission } from "../auth/rbac.ts";
 
 export interface ApiRequest extends IncomingMessage {
   body?: any;
@@ -17,14 +17,16 @@ export interface ApiResponse extends ServerResponse {
  * Extracts client IP address accurately from standard headers
  */
 export function getClientIp(req: IncomingMessage): string {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) {
-    const list = Array.isArray(forwarded) ? forwarded[0] : forwarded.split(",")[0];
-    return list.trim();
-  }
-  const realIp = req.headers["x-real-ip"];
-  if (realIp) {
-    return Array.isArray(realIp) ? realIp[0].trim() : realIp.trim();
+  if (process.env.VERCEL === "1") {
+    const vercelForwarded = req.headers["x-vercel-forwarded-for"];
+    if (vercelForwarded) {
+      const first = (Array.isArray(vercelForwarded) ? vercelForwarded[0] : vercelForwarded.split(",")[0]).trim();
+      if (/^[0-9a-fA-F:.]{3,45}$/.test(first)) return first;
+    }
+    const realIp = req.headers["x-real-ip"];
+    if (typeof realIp === "string" && /^[0-9a-fA-F:.]{3,45}$/.test(realIp.trim())) {
+      return realIp.trim();
+    }
   }
   return req.socket.remoteAddress || "127.0.0.1";
 }
@@ -71,28 +73,34 @@ export async function parseBody<T = any>(req: IncomingMessage): Promise<T> {
  */
 export function applyCorsHeaders(req: IncomingMessage, res: ServerResponse): void {
   const origin = req.headers.origin;
-  const host = req.headers.host;
 
-  // Restrict CORS strictly to matching host or local dev
+  // Strict CORS policy: allow explicit production origin, ALLOWED_ORIGINS, or local dev
+  res.setHeader("Vary", "Origin");
   if (origin) {
     try {
       const originUrl = new URL(origin);
-      if (host && originUrl.host === host) {
-        res.setHeader("Access-Control-Allow-Origin", origin);
-      } else if (originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1") {
-        res.setHeader("Access-Control-Allow-Origin", origin);
+      const isProd = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+      const extraOrigins = (process.env.ALLOWED_ORIGINS || "https://e-dam-iare.vercel.app")
+        .split(",")
+        .map((v) => v.trim())
+        .filter(Boolean);
+      const isAllowed =
+        extraOrigins.includes(originUrl.origin) ||
+        (!isProd && (originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1"));
+
+      if (isAllowed) {
+        res.setHeader("Access-Control-Allow-Origin", originUrl.origin);
+        res.setHeader("Access-Control-Allow-Credentials", "true");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+        res.setHeader(
+          "Access-Control-Allow-Headers",
+          "Content-Type, Authorization, X-Requested-With, X-CSRF-Token"
+        );
       }
     } catch {
       // Ignore malformed origin header
     }
   }
-
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
-  res.setHeader(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With, X-CSRF-Token"
-  );
 }
 
 /**
@@ -105,13 +113,17 @@ export function validateCsrf(req: IncomingMessage): boolean {
   }
 
   const origin = req.headers.origin;
-  const host = req.headers.host;
+  const isProd = process.env.VERCEL_ENV === "production" || process.env.NODE_ENV === "production";
+  const allowedOrigins = (process.env.ALLOWED_ORIGINS || "https://e-dam-iare.vercel.app")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
 
-  if (origin && host) {
+  if (origin) {
     try {
-      const originHost = new URL(origin).host;
-      if (originHost === host) return true;
-      if (originHost.startsWith("localhost") || originHost.startsWith("127.0.0.1")) return true;
+      const originUrl = new URL(origin);
+      if (allowedOrigins.includes(originUrl.origin)) return true;
+      if (!isProd && (originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1")) return true;
       return false;
     } catch {
       return false;
@@ -120,23 +132,25 @@ export function validateCsrf(req: IncomingMessage): boolean {
 
   // If no origin header, check referer
   const referer = req.headers.referer;
-  if (referer && host) {
+  if (referer) {
     try {
-      const refererHost = new URL(referer).host;
-      if (refererHost === host) return true;
-      if (refererHost.startsWith("localhost") || refererHost.startsWith("127.0.0.1")) return true;
+      const refUrl = new URL(referer);
+      if (allowedOrigins.includes(refUrl.origin)) return true;
+      if (!isProd && (refUrl.hostname === "localhost" || refUrl.hostname === "127.0.0.1")) return true;
       return false;
     } catch {
       return false;
     }
   }
 
-  // Allow server-to-server requests without Origin if authorization header is present
-  if (req.headers.authorization) {
+  const cookies = parseCookies(req);
+  const viaCookie = Boolean(cookies["edam_admin_session"]);
+  // Allow pure Bearer API requests without cookie; fail closed on cookie mutations lacking Origin/Referer
+  if (req.headers.authorization?.startsWith("Bearer ") && !viaCookie) {
     return true;
   }
 
-  return true;
+  return false;
 }
 
 /**
@@ -189,7 +203,7 @@ export function parseCookies(req: IncomingMessage): Record<string, string> {
  * Sets secure HTTP-Only authentication cookie
  */
 export function setAuthCookie(res: ServerResponse, token: string): void {
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || process.env.VERCEL_ENV === "production";
   const secureFlag = isProd ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",
@@ -201,7 +215,7 @@ export function setAuthCookie(res: ServerResponse, token: string): void {
  * Clears authentication cookie
  */
 export function clearAuthCookie(res: ServerResponse): void {
-  const isProd = process.env.NODE_ENV === "production";
+  const isProd = process.env.NODE_ENV === "production" || process.env.VERCEL === "1" || process.env.VERCEL_ENV === "production";
   const secureFlag = isProd ? "; Secure" : "";
   res.setHeader(
     "Set-Cookie",

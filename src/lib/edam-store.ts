@@ -153,6 +153,7 @@ export function toggleCertificateStatus(certId: string): IssuedCertificate | nul
 
 /**
  * Event Registrations Registry
+ * Never seeds hardcoded personal student PII into the browser bundle.
  */
 export function getStoredRegistrations(): EventRegistration[] {
   try {
@@ -164,47 +165,7 @@ export function getStoredRegistrations(): EventRegistration[] {
   } catch (e) {
     console.warn("Could not read registrations from localStorage", e);
   }
-  return [
-    {
-      id: "reg-01",
-      eventId: "edam-evt-01",
-      eventTitle: "Design Sprint 2026: 48-Hour UI/UX Challenge",
-      attendeeName: "K. Sai Charan",
-      email: "charan@edam.iare.ac.in",
-      phone: "+91 9876543210",
-      rollNumber: "22951A0501",
-      department: "CSE",
-      yearOfStudy: "IV",
-      submittedAt: "2026-10-24T12:00:00Z",
-      status: "registered",
-    },
-    {
-      id: "reg-02",
-      eventId: "edam-evt-01",
-      eventTitle: "Design Sprint 2026: 48-Hour UI/UX Challenge",
-      attendeeName: "M. Sneha",
-      email: "sneha.m@iare.ac.in",
-      phone: "+91 9876543211",
-      rollNumber: "23951A0588",
-      department: "CSE",
-      yearOfStudy: "III",
-      submittedAt: "2026-10-24T13:30:00Z",
-      status: "registered",
-    },
-    {
-      id: "reg-03",
-      eventId: "edam-evt-02",
-      eventTitle: "Creative Coding: Three.js & Interactive WebGL",
-      attendeeName: "V. Arjun",
-      email: "arjun.v@iare.ac.in",
-      phone: "+91 9876543212",
-      rollNumber: "23951A6612",
-      department: "AI/ML",
-      yearOfStudy: "III",
-      submittedAt: "2026-10-25T09:15:00Z",
-      status: "registered",
-    },
-  ];
+  return [];
 }
 
 export function saveStoredRegistrations(regs: EventRegistration[]) {
@@ -225,5 +186,102 @@ export function registerAttendee(data: Omit<EventRegistration, "id" | "submitted
   };
   saveStoredRegistrations([newReg, ...regs]);
   return newReg;
+}
+
+/**
+ * Normalizes snake_case or mixed API payloads from Neon PostgreSQL into frontend types
+ */
+export function mapApiEvent(raw: any): ChapterEvent {
+  const modeRaw = String(raw.mode || "In-Person").toLowerCase();
+  const mode: ChapterEvent["mode"] =
+    modeRaw === "online" || modeRaw === "virtual"
+      ? "Virtual"
+      : modeRaw === "hybrid"
+      ? "Hybrid"
+      : "In-Person";
+
+  const statusRaw = String(raw.status || "upcoming").toLowerCase();
+  const status: ChapterEvent["status"] =
+    statusRaw === "completed" || statusRaw === "past"
+      ? "past"
+      : statusRaw === "cancelled"
+      ? "cancelled"
+      : statusRaw === "postponed"
+      ? "postponed"
+      : statusRaw === "registration_closed"
+      ? "registration_closed"
+      : "upcoming";
+
+  return {
+    id: String(raw.id),
+    slug: String(raw.slug || raw.id),
+    title: String(raw.title || ""),
+    tagline: String(raw.tagline || ""),
+    category: (raw.category || "Workshop") as ChapterEvent["category"],
+    status,
+    date: String(raw.date || ""),
+    time: String(raw.time || ""),
+    venue: String(raw.venue || "IARE Campus"),
+    mode,
+    description: String(raw.description || ""),
+    detailedOverview: Array.isArray(raw.detailed_overview ?? raw.detailedOverview)
+      ? (raw.detailed_overview ?? raw.detailedOverview)
+      : [],
+    prerequisites: Array.isArray(raw.prerequisites) ? raw.prerequisites : [],
+    takeaways: Array.isArray(raw.takeaways) ? raw.takeaways : [],
+    speakers: Array.isArray(raw.speakers) ? raw.speakers : [],
+    registrationDeadline: String(raw.registration_deadline ?? raw.registrationDeadline ?? raw.date ?? ""),
+    registrationOpen: Boolean(raw.registration_open ?? raw.registrationOpen ?? true),
+    registrationUrl: raw.registration_url ?? raw.registrationUrl ?? undefined,
+    bannerImage: raw.banner_image ?? raw.bannerImage ?? undefined,
+    capacity: typeof raw.capacity === "number" ? raw.capacity : 100,
+    featured: Boolean(raw.featured),
+    googleFormId: raw.google_form_id ?? raw.googleFormId ?? undefined,
+    googleFormUrl: raw.google_form_url ?? raw.googleFormUrl ?? undefined,
+    formStatus: raw.form_status ?? raw.formStatus ?? undefined,
+    responseCount: typeof (raw.response_count ?? raw.responseCount) === "number"
+      ? (raw.response_count ?? raw.responseCount)
+      : 0,
+    createdAt: raw.created_at ?? raw.createdAt,
+    updatedAt: raw.updated_at ?? raw.updatedAt,
+  };
+}
+
+export function mapApiCertificate(raw: any): IssuedCertificate {
+  const certNum = String(raw.certificate_number ?? raw.certificateNumber ?? raw.id);
+  return {
+    id: String(raw.id || certNum),
+    certificateNumber: certNum,
+    recipientName: String(raw.recipient_name ?? raw.recipientName ?? ""),
+    recipientEmail: String(raw.recipient_email ?? raw.recipientEmail ?? ""),
+    recipientRollNumber: raw.recipient_roll_number ?? raw.recipientRollNumber ?? raw.rollNumber ?? undefined,
+    recipientDepartment: raw.recipient_department ?? raw.recipientDepartment ?? raw.department ?? undefined,
+    eventId: String(raw.event_id ?? raw.eventId ?? ""),
+    eventTitle: String(raw.event_title ?? raw.eventTitle ?? ""),
+    eventDate: raw.event_date ?? raw.eventDate ?? undefined,
+    certificateType: (raw.certificate_type ?? raw.certificateType ?? raw.type ?? "participation") as IssuedCertificate["certificateType"],
+    issuedAt: String(raw.issued_at ?? raw.issuedAt ?? new Date().toISOString()),
+    issuedBy: String(raw.issued_by ?? raw.issuedBy ?? "e-DAM Executive Council"),
+    status: raw.status === "revoked" ? "revoked" : "valid",
+    revokedAt: raw.revoked_at ?? raw.revokedAt ?? undefined,
+    revokedReason: raw.revoked_reason ?? raw.revokedReason ?? undefined,
+    verificationCode: certNum,
+  };
+}
+
+export function mapApiRegistration(raw: any): EventRegistration {
+  return {
+    id: String(raw.id),
+    eventId: String(raw.event_id ?? raw.eventId ?? ""),
+    eventTitle: raw.event_title ?? raw.eventTitle ?? undefined,
+    attendeeName: String(raw.full_name ?? raw.attendeeName ?? ""),
+    email: String(raw.email ?? ""),
+    phone: raw.phone ?? undefined,
+    rollNumber: String(raw.roll_number ?? raw.rollNumber ?? ""),
+    department: String(raw.department ?? ""),
+    yearOfStudy: String(raw.year_of_study ?? raw.yearOfStudy ?? ""),
+    submittedAt: String(raw.submitted_at ?? raw.submittedAt ?? new Date().toISOString()),
+    status: "registered",
+  };
 }
 

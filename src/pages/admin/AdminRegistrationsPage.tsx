@@ -1,61 +1,73 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Search,
   Download,
   Award,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { useAdminAuth } from "@/context/AdminAuthContext";
-import {
-  getStoredRegistrations,
-  getStoredEvents,
-  issueNewCertificate,
-} from "@/lib/edam-store";
-import type { EventRegistration } from "@/types";
+import { ApiClient } from "@/lib/api-client";
+import { mapApiEvent, mapApiRegistration } from "@/lib/edam-store";
+import { sanitizeCsvCell } from "@/lib/utils";
+import type { EventRegistration, ChapterEvent } from "@/types";
 import { Button } from "@/components/ui/Button";
 
 export const AdminRegistrationsPage: React.FC = () => {
-  const { canIssueCertificates } = useAdminAuth();
+  const { canIssueCertificates, canManageRegistrations } = useAdminAuth();
   const [registrations, setRegistrations] = useState<EventRegistration[]>([]);
+  const [events, setEvents] = useState<ChapterEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState("all");
   const [search, setSearch] = useState("");
   const [issuedRegIds, setIssuedRegIds] = useState<string[]>([]);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  const events = getStoredEvents();
+  const loadData = useCallback(async () => {
+    const [regsRes, eventsRes] = await Promise.all([
+      ApiClient.getRegistrations(),
+      ApiClient.getEvents(),
+    ]);
 
-  useEffect(() => {
-    setRegistrations(getStoredRegistrations());
+    if (regsRes.success && Array.isArray(regsRes.registrations)) {
+      setRegistrations(regsRes.registrations.map(mapApiRegistration));
+    } else if (!regsRes.success) {
+      setErrorMsg(regsRes.error || "Unable to load participant registrations.");
+    }
+
+    if (eventsRes.success && Array.isArray(eventsRes.events)) {
+      setEvents(eventsRes.events.map(mapApiEvent));
+    }
   }, []);
 
-  const handleIssueCertForAttendee = (reg: EventRegistration) => {
-    issueNewCertificate({
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleIssueCertForAttendee = async (reg: EventRegistration) => {
+    if (!canIssueCertificates) return;
+    setErrorMsg(null);
+    setStatusMsg(null);
+
+    const res = await ApiClient.issueCertificate({
       recipientName: reg.attendeeName,
       recipientEmail: reg.email,
       recipientRollNumber: reg.rollNumber,
       recipientDepartment: reg.department,
       eventId: reg.eventId,
       eventTitle: reg.eventTitle || "e-DAM Community Workshop",
+      registrationId: reg.id,
       certificateType: "participation",
     });
-    setIssuedRegIds((prev) => [...prev, reg.id]);
-    alert(`Certificate generated and accredited for ${reg.attendeeName}! View in Certificates tab.`);
-  };
 
-  const handleExportCsv = () => {
-    const headers = ["Attendee Name,Roll Number,Email,Phone,Department,Year,Event Title,Submitted At"];
-    const rows = filteredRegs.map((r) =>
-      `"${r.attendeeName}","${r.rollNumber}","${r.email}","${r.phone || ""}","${r.department}","${r.yearOfStudy}","${r.eventTitle || ""}","${r.submittedAt}"`
-    );
-    const csvContent = "data:text/csv;charset=utf-8," + [headers, ...rows].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `edam_registrations_${Date.now()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (res.success) {
+      setIssuedRegIds((prev) => [...prev, reg.id]);
+      setStatusMsg(`Certificate ${res.certificateNumber} issued for ${reg.attendeeName}.`);
+    } else {
+      setErrorMsg(res.error || "Unable to issue certificate for attendee.");
+    }
   };
 
   const filteredRegs = registrations.filter((reg) => {
@@ -69,6 +81,48 @@ export const AdminRegistrationsPage: React.FC = () => {
       reg.department.toLowerCase().includes(q)
     );
   });
+
+  const handleExportCsv = () => {
+    if (!canManageRegistrations) return;
+    const headers = [
+      "Attendee Name",
+      "Roll Number",
+      "Email",
+      "Phone",
+      "Department",
+      "Year",
+      "Event Title",
+      "Submitted At",
+    ]
+      .map(sanitizeCsvCell)
+      .join(",");
+
+    const rows = filteredRegs.map((r) =>
+      [
+        r.attendeeName,
+        r.rollNumber,
+        r.email,
+        r.phone || "",
+        r.department,
+        r.yearOfStudy,
+        r.eventTitle || "",
+        r.submittedAt,
+      ]
+        .map(sanitizeCsvCell)
+        .join(",")
+    );
+
+    const csvContent = "\uFEFF" + [headers, ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `edam_registrations_${Date.now()}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-[#030305] text-[#F5F3FF] flex flex-col">
@@ -85,11 +139,27 @@ export const AdminRegistrationsPage: React.FC = () => {
             </p>
           </div>
 
-          <Button variant="secondary" size="md" onClick={handleExportCsv}>
-            <Download className="w-4 h-4" />
-            <span>Export to CSV</span>
-          </Button>
+          {canManageRegistrations && (
+            <Button variant="secondary" size="md" onClick={handleExportCsv}>
+              <Download className="w-4 h-4" />
+              <span>Export to CSV</span>
+            </Button>
+          )}
         </div>
+
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {statusMsg && (
+          <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{statusMsg}</span>
+          </div>
+        )}
 
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
@@ -142,10 +212,10 @@ export const AdminRegistrationsPage: React.FC = () => {
                         <div className="text-[11px] text-[#928A9F] font-mono">{reg.email}</div>
                       </td>
                       <td className="py-3.5 px-4 font-mono font-bold text-[#C4B5FD]">
-                        {reg.rollNumber}
+                        {reg.rollNumber || "—"}
                       </td>
                       <td className="py-3.5 px-4 text-white/80">
-                        {reg.department} • Year {reg.yearOfStudy}
+                        {reg.department || "IARE"} {reg.yearOfStudy ? `• Year ${reg.yearOfStudy}` : ""}
                       </td>
                       <td className="py-3.5 px-4 max-w-xs truncate text-[#928A9F]">
                         {reg.eventTitle || "e-DAM Event"}
@@ -161,6 +231,7 @@ export const AdminRegistrationsPage: React.FC = () => {
                           </span>
                         ) : canIssueCertificates ? (
                           <button
+                            type="button"
                             onClick={() => handleIssueCertForAttendee(reg)}
                             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#8B5CF6]/15 hover:bg-[#8B5CF6]/30 text-[#C4B5FD] hover:text-white border border-[#8B5CF6]/30 text-xs font-semibold transition-colors cursor-pointer"
                           >
@@ -172,6 +243,13 @@ export const AdminRegistrationsPage: React.FC = () => {
                     </tr>
                   );
                 })}
+                {filteredRegs.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#928A9F]">
+                      No participant registrations found.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

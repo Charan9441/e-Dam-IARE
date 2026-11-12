@@ -68,8 +68,8 @@ const role = ["SUPER_ADMIN", "ADMIN", "EDITOR", "VIEWER"].includes(rawRole.toUpp
   ? rawRole.toUpperCase()
   : "ADMIN";
 
-if (password.length < 8) {
-  console.error("Error: Password must be at least 8 characters long for security compliance.");
+if (password.length < 12) {
+  console.error("Error: Password must be at least 12 characters long for security compliance.");
   process.exit(1);
 }
 

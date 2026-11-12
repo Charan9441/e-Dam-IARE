@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   Calendar,
@@ -7,37 +7,57 @@ import {
   PlusCircle,
   ExternalLink,
   FileSpreadsheet,
+  AlertCircle,
 } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { useAdminAuth } from "@/context/AdminAuthContext";
-import {
-  getStoredEvents,
-  getStoredCertificates,
-  getStoredRegistrations,
-  updateEvent,
-} from "@/lib/edam-store";
+import { ApiClient } from "@/lib/api-client";
+import { mapApiEvent } from "@/lib/edam-store";
 import type { ChapterEvent } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 
 export const AdminDashboardPage: React.FC = () => {
-  const { user, canCreateEvents } = useAdminAuth();
+  const { user, canCreateEvents, canEditEvents, canIssueCertificates } = useAdminAuth();
   const [events, setEvents] = useState<ChapterEvent[]>([]);
   const [certCount, setCertCount] = useState(0);
   const [regCount, setRegCount] = useState(0);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  useEffect(() => {
-    const evts = getStoredEvents();
-    setEvents(evts);
-    setCertCount(getStoredCertificates().length);
-    setRegCount(getStoredRegistrations().length);
+  const loadDashboardData = useCallback(async () => {
+    setErrorMsg(null);
+    const [eventsRes, certsRes, regsRes] = await Promise.all([
+      ApiClient.getEvents(),
+      ApiClient.getCertificates(),
+      ApiClient.getRegistrations(),
+    ]);
+
+    if (eventsRes.success && Array.isArray(eventsRes.events)) {
+      setEvents(eventsRes.events.map(mapApiEvent));
+    }
+    if (certsRes.success && Array.isArray(certsRes.certificates)) {
+      setCertCount(certsRes.certificates.length);
+    }
+    if (regsRes.success && Array.isArray(regsRes.registrations)) {
+      setRegCount(regsRes.registrations.length);
+    }
   }, []);
 
-  const toggleEventReg = (event: ChapterEvent) => {
-    const updated = updateEvent(event.id, { registrationOpen: !event.registrationOpen });
-    if (updated) {
-      setEvents(getStoredEvents());
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const toggleEventReg = async (event: ChapterEvent) => {
+    if (!canEditEvents) return;
+    setErrorMsg(null);
+    const res = await ApiClient.updateEvent(event.id, {
+      registrationOpen: !event.registrationOpen,
+    });
+    if (res.success) {
+      await loadDashboardData();
+    } else {
+      setErrorMsg(res.error || "Unable to update event registration status.");
     }
   };
 
@@ -74,14 +94,23 @@ export const AdminDashboardPage: React.FC = () => {
                 </Button>
               </Link>
             )}
-            <Link to="/admin/certificates">
-              <Button variant="secondary" size="sm">
-                <Award className="w-4 h-4" />
-                <span>Issue Certificate</span>
-              </Button>
-            </Link>
+            {canIssueCertificates && (
+              <Link to="/admin/certificates">
+                <Button variant="secondary" size="sm">
+                  <Award className="w-4 h-4" />
+                  <span>Issue Certificate</span>
+                </Button>
+              </Link>
+            )}
           </div>
         </div>
+
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div className="rounded-2xl bg-[#0B0614] border border-[#8B5CF6]/20 p-5 space-y-2">
@@ -163,16 +192,29 @@ export const AdminDashboardPage: React.FC = () => {
                       </Badge>
                     </td>
                     <td className="py-3.5 px-4">
-                      <button
-                        onClick={() => toggleEventReg(evt)}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
-                          evt.registrationOpen
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30"
-                            : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
-                        }`}
-                      >
-                        {evt.registrationOpen ? "● Open (Toggle)" : "Closed (Toggle)"}
-                      </button>
+                      {canEditEvents ? (
+                        <button
+                          type="button"
+                          onClick={() => toggleEventReg(evt)}
+                          className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
+                            evt.registrationOpen
+                              ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30"
+                              : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                          }`}
+                        >
+                          {evt.registrationOpen ? "● Open (Toggle)" : "Closed (Toggle)"}
+                        </button>
+                      ) : (
+                        <span
+                          className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border ${
+                            evt.registrationOpen
+                              ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                              : "bg-white/5 text-white/50 border-white/10"
+                          }`}
+                        >
+                          {evt.registrationOpen ? "● Open" : "Closed"}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 text-right space-x-2">
                       <Link
@@ -186,6 +228,13 @@ export const AdminDashboardPage: React.FC = () => {
                     </td>
                   </tr>
                 ))}
+                {events.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#928A9F]">
+                      No active chapter events found in the database.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

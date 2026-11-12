@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import {
   Calendar,
@@ -12,17 +12,37 @@ import {
   ExternalLink,
   Share2,
 } from "lucide-react";
-import { getEventBySlug } from "@/lib/edam-store";
+import { getEventBySlug, mapApiEvent } from "@/lib/edam-store";
+import { ApiClient } from "@/lib/api-client";
+import { safeExternalHttpUrl } from "@/lib/utils";
+import type { ChapterEvent } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { EventRegistrationModal } from "@/components/events/EventRegistrationModal";
 
 export const EventDetailPage: React.FC = () => {
   const { slug } = useParams<{ slug: string }>();
+  const [event, setEvent] = useState<ChapterEvent | undefined>(() =>
+    slug ? getEventBySlug(slug) : undefined
+  );
   const [showModal, setShowModal] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const event = slug ? getEventBySlug(slug) : undefined;
+  useEffect(() => {
+    if (!slug) return;
+    setEvent(getEventBySlug(slug));
+    let cancelled = false;
+    ApiClient.getEventBySlug(slug).then((res) => {
+      if (!cancelled && res.success && res.event) {
+        setEvent(mapApiEvent(res.event));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [slug]);
+
+  const safeGoogleFormUrl = safeExternalHttpUrl(event?.googleFormUrl);
 
   if (!event) {
     return (
@@ -256,9 +276,9 @@ export const EventDetailPage: React.FC = () => {
                     <span>Register for Event</span>
                   </Button>
 
-                  {event.googleFormUrl && (
+                  {safeGoogleFormUrl && (
                     <a
-                      href={event.googleFormUrl}
+                      href={safeGoogleFormUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-semibold text-white/80 hover:text-white transition-colors border border-white/10"

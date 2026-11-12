@@ -3,7 +3,7 @@
  * System: e-DAM IARE
  */
 
-import type { AdminRole } from "../db/schema";
+import type { AdminRole } from "../db/schema.ts";
 
 export type Permission =
   | "events:view"

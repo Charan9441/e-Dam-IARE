@@ -5,9 +5,9 @@
 
 import crypto from "node:crypto";
 import bcrypt from "bcryptjs";
-import { sql } from "../db";
-import { normalizeRole, type Permission, hasPermission } from "./rbac";
-import type { AdminRole } from "../db/schema";
+import { sql } from "../db/index.ts";
+import { normalizeRole, type Permission, hasPermission } from "./rbac.ts";
+import type { AdminRole } from "../db/schema.ts";
 
 export interface AuthenticatedUser {
   id: string;
@@ -188,7 +188,7 @@ export class AuthService {
       INSERT INTO admin_sessions (
         id, user_id, token, ip_address, user_agent, last_activity_at, expires_at, created_at
       ) VALUES (
-        ${'sess_' + Date.now()},
+        ${`sess_${crypto.randomUUID()}`},
         ${user.id},
         ${token},
         ${ip},

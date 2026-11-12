@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import {
   PlusCircle,
@@ -8,16 +8,15 @@ import {
   ExternalLink,
   X,
   Sparkles,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import { AdminHeader } from "@/components/admin/AdminHeader";
 import { AdminFooter } from "@/components/admin/AdminFooter";
 import { useAdminAuth } from "@/context/AdminAuthContext";
-import {
-  getStoredEvents,
-  addEvent,
-  updateEvent,
-  deleteEvent,
-} from "@/lib/edam-store";
+import { ApiClient } from "@/lib/api-client";
+import { mapApiEvent } from "@/lib/edam-store";
+import { safeExternalHttpUrl } from "@/lib/utils";
 import type { ChapterEvent, EventCategory } from "@/types";
 import { Button } from "@/components/ui/Button";
 import { createGoogleFormViaAppsScript } from "@/lib/google-apps-script";
@@ -29,6 +28,10 @@ export const AdminEventsPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isGeneratingForm, setIsGeneratingForm] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -45,12 +48,23 @@ export const AdminEventsPage: React.FC = () => {
     registrationOpen: true,
   });
 
-  useEffect(() => {
-    setEvents(getStoredEvents());
+  const loadEvents = useCallback(async () => {
+    const res = await ApiClient.getEvents();
+    if (res.success && Array.isArray(res.events)) {
+      setEvents(res.events.map(mapApiEvent));
+    } else if (!res.success) {
+      setErrorMsg(res.error || "Unable to fetch events from the server.");
+    }
   }, []);
 
+  useEffect(() => {
+    loadEvents();
+  }, [loadEvents]);
+
   const handleOpenCreate = () => {
+    if (!canCreateEvents) return;
     setEditingId(null);
+    setModalError(null);
     setFormData({
       title: "",
       slug: "",
@@ -68,7 +82,9 @@ export const AdminEventsPage: React.FC = () => {
   };
 
   const handleOpenEdit = (evt: ChapterEvent) => {
+    if (!canEditEvents) return;
     setEditingId(evt.id);
+    setModalError(null);
     setFormData({
       title: evt.title,
       slug: evt.slug,
@@ -85,21 +101,38 @@ export const AdminEventsPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this event?")) {
-      deleteEvent(id);
-      setEvents(getStoredEvents());
+  const handleDelete = async (id: string) => {
+    if (!canDeleteEvents) return;
+    if (!window.confirm("Are you sure you want to archive/delete this event?")) return;
+    setErrorMsg(null);
+    setStatusMsg(null);
+    const res = await ApiClient.deleteEvent(id);
+    if (res.success) {
+      setStatusMsg("Event archived successfully.");
+      await loadEvents();
+    } else {
+      setErrorMsg(res.error || "Failed to archive event.");
     }
   };
 
-  const handleToggleReg = (evt: ChapterEvent) => {
-    updateEvent(evt.id, { registrationOpen: !evt.registrationOpen });
-    setEvents(getStoredEvents());
+  const handleToggleReg = async (evt: ChapterEvent) => {
+    if (!canEditEvents) return;
+    setErrorMsg(null);
+    const res = await ApiClient.updateEvent(evt.id, {
+      registrationOpen: !evt.registrationOpen,
+    });
+    if (res.success) {
+      await loadEvents();
+    } else {
+      setErrorMsg(res.error || "Failed to update registration status.");
+    }
   };
 
   const handleAutoGenerateForm = async () => {
+    if (!canCreateEvents) return;
+    setModalError(null);
     if (!formData.title.trim()) {
-      alert("Please enter an Event Title first before generating the Google Form.");
+      setModalError("Please enter an Event Title first before generating the Google Form.");
       return;
     }
 
@@ -107,31 +140,56 @@ export const AdminEventsPage: React.FC = () => {
     try {
       const res = await createGoogleFormViaAppsScript({
         eventId: editingId || `evt_${Date.now().toString(36)}`,
-        title: formData.title,
-        description: formData.description || formData.tagline || "Official event registration for e-DAM IARE.",
+        title: formData.title.trim(),
+        description:
+          formData.description.trim() ||
+          formData.tagline.trim() ||
+          "Official event registration for e-DAM IARE.",
         date: formData.date,
         time: formData.time,
         venue: formData.venue,
         registrationOpen: formData.registrationOpen,
       });
 
-      if (res.success && res.formUrl) {
-        setFormData((prev) => ({ ...prev, googleFormUrl: res.formUrl || "" }));
-        alert(`Google Form created successfully via Apps Script!\n\nForm URL: ${res.formUrl}`);
+      const validFormUrl = safeExternalHttpUrl(res.formUrl);
+      if (res.success && validFormUrl) {
+        setFormData((prev) => ({ ...prev, googleFormUrl: validFormUrl }));
+        setStatusMsg("Google Form created and linked securely via server proxy.");
       } else {
-        alert(`Google Apps Script response: ${res.error || "Could not generate form. Check Apps Script permissions."}`);
+        setModalError(res.error || "Could not generate form. Verify Apps Script configuration.");
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      alert(`Error calling Apps Script: ${msg}`);
+    } catch {
+      setModalError("Unable to reach Google Apps Script integration service.");
     } finally {
       setIsGeneratingForm(false);
     }
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.title.trim()) return;
+    setModalError(null);
+    setErrorMsg(null);
+
+    const canSubmit = editingId ? canEditEvents : canCreateEvents;
+    if (!canSubmit) {
+      setModalError("You do not have permission to perform this action.");
+      return;
+    }
+
+    if (!formData.title.trim()) {
+      setModalError("Event title is required.");
+      return;
+    }
+
+    let cleanedFormUrl: string | undefined;
+    if (formData.googleFormUrl.trim()) {
+      const checked = safeExternalHttpUrl(formData.googleFormUrl);
+      if (!checked) {
+        setModalError("Google Form URL must be a valid https:// or http:// link.");
+        return;
+      }
+      cleanedFormUrl = checked;
+    }
 
     const slug =
       formData.slug.trim() ||
@@ -140,50 +198,43 @@ export const AdminEventsPage: React.FC = () => {
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/(^-|-$)+/g, "");
 
-    if (editingId) {
-      updateEvent(editingId, {
-        title: formData.title,
-        slug,
-        tagline: formData.tagline,
-        category: formData.category,
-        date: formData.date,
-        time: formData.time,
-        venue: formData.venue,
-        mode: formData.mode,
-        description: formData.description,
-        googleFormUrl: formData.googleFormUrl.trim() || undefined,
-        registrationOpen: formData.registrationOpen,
-      });
-    } else {
-      addEvent({
-        title: formData.title,
-        slug,
-        tagline: formData.tagline,
-        category: formData.category,
-        status: "upcoming",
-        date: formData.date,
-        time: formData.time,
-        venue: formData.venue,
-        mode: formData.mode,
-        description: formData.description,
-        detailedOverview: [formData.description],
-        prerequisites: ["Curiosity and passion for building."],
-        takeaways: ["Official Certificate of Participation from e-DAM."],
-        speakers: [
-          {
-            name: "e-DAM Lead Facilitators",
-            role: "Domain Leads",
-            organization: "e-DAM IARE",
-          },
-        ],
-        registrationDeadline: formData.date,
-        registrationOpen: formData.registrationOpen,
-        googleFormUrl: formData.googleFormUrl.trim() || undefined,
-      });
-    }
+    const payload = {
+      title: formData.title.trim(),
+      slug,
+      tagline: formData.tagline.trim(),
+      category: formData.category,
+      status: "upcoming",
+      date: formData.date,
+      time: formData.time.trim(),
+      venue: formData.venue.trim(),
+      mode:
+        formData.mode === "Virtual"
+          ? "online"
+          : formData.mode === "Hybrid"
+          ? "hybrid"
+          : "offline",
+      description: formData.description.trim(),
+      googleFormUrl: cleanedFormUrl || "",
+      registrationUrl: cleanedFormUrl || "",
+      registrationOpen: formData.registrationOpen,
+    };
 
-    setEvents(getStoredEvents());
-    setIsModalOpen(false);
+    setIsSaving(true);
+    try {
+      const res = editingId
+        ? await ApiClient.updateEvent(editingId, payload)
+        : await ApiClient.createEvent(payload);
+
+      if (res.success) {
+        setStatusMsg(editingId ? "Event updated successfully." : "Event created successfully.");
+        setIsModalOpen(false);
+        await loadEvents();
+      } else {
+        setModalError(res.error || "Failed to save event.");
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const filteredEvents = events.filter((e) => {
@@ -219,6 +270,20 @@ export const AdminEventsPage: React.FC = () => {
           )}
         </div>
 
+        {errorMsg && (
+          <div className="p-3.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5">
+            <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+            <span>{errorMsg}</span>
+          </div>
+        )}
+
+        {statusMsg && (
+          <div className="p-3.5 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
+            <span>{statusMsg}</span>
+          </div>
+        )}
+
         <div className="relative max-w-md">
           <Search className="w-4 h-4 text-white/40 absolute left-4 top-1/2 -translate-y-1/2" />
           <input
@@ -244,78 +309,103 @@ export const AdminEventsPage: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5 text-[#F5F3FF]">
-                {filteredEvents.map((evt) => (
-                  <tr key={evt.id} className="hover:bg-white/5 transition-colors">
-                    <td className="py-3.5 px-4 font-semibold text-white max-w-xs">
-                      <div className="truncate">{evt.title}</div>
-                      <div className="text-[11px] text-[#928A9F] font-mono truncate">{evt.venue}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#C4B5FD] text-[10px] font-semibold border border-[#8B5CF6]/30">
-                        {evt.category}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <div className="font-mono text-white/90">{evt.date}</div>
-                      <div className="text-[11px] text-white/50">{evt.time}</div>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      <button
-                        onClick={() => handleToggleReg(evt)}
-                        className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
-                          evt.registrationOpen
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30"
-                            : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
-                        }`}
-                      >
-                        {evt.registrationOpen ? "● Open" : "Closed"}
-                      </button>
-                    </td>
-                    <td className="py-3.5 px-4">
-                      {evt.googleFormUrl ? (
-                        <a
-                          href={evt.googleFormUrl}
+                {filteredEvents.map((evt) => {
+                  const safeLink = safeExternalHttpUrl(evt.googleFormUrl);
+                  return (
+                    <tr key={evt.id} className="hover:bg-white/5 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-white max-w-xs">
+                        <div className="truncate">{evt.title}</div>
+                        <div className="text-[11px] text-[#928A9F] font-mono truncate">{evt.venue}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="px-2.5 py-0.5 rounded-full bg-[#8B5CF6]/15 text-[#C4B5FD] text-[10px] font-semibold border border-[#8B5CF6]/30">
+                          {evt.category}
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <div className="font-mono text-white/90">{evt.date}</div>
+                        <div className="text-[11px] text-white/50">{evt.time}</div>
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {canEditEvents ? (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleReg(evt)}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold cursor-pointer transition-colors ${
+                              evt.registrationOpen
+                                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-500/30"
+                                : "bg-white/5 text-white/50 border border-white/10 hover:bg-white/10"
+                            }`}
+                          >
+                            {evt.registrationOpen ? "● Open" : "Closed"}
+                          </button>
+                        ) : (
+                          <span
+                            className={`inline-block px-2.5 py-1 rounded-md text-[10px] font-bold border ${
+                              evt.registrationOpen
+                                ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+                                : "bg-white/5 text-white/50 border-white/10"
+                            }`}
+                          >
+                            {evt.registrationOpen ? "● Open" : "Closed"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        {safeLink ? (
+                          <a
+                            href={safeLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] text-purple-300 hover:text-white"
+                          >
+                            <span>Linked Form</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        ) : (
+                          <span className="text-[11px] text-white/30">None</span>
+                        )}
+                      </td>
+                      <td className="py-3.5 px-4 text-right space-x-2">
+                        {canEditEvents && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(evt)}
+                            className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
+                            title="Edit Event"
+                          >
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {canDeleteEvents && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(evt.id)}
+                            className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors cursor-pointer"
+                            title="Delete Event"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <Link
+                          to={`/events/${evt.slug}`}
                           target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] text-purple-300 hover:text-white"
+                          className="p-1.5 inline-block rounded-lg bg-white/5 hover:bg-white/10 text-[#8B5CF6] hover:text-white transition-colors"
+                          title="Preview Public Page"
                         >
-                          <span>Linked Form</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      ) : (
-                        <span className="text-[11px] text-white/30">None</span>
-                      )}
-                    </td>
-                    <td className="py-3.5 px-4 text-right space-x-2">
-                      {canEditEvents && (
-                        <button
-                          onClick={() => handleOpenEdit(evt)}
-                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/80 hover:text-white transition-colors cursor-pointer"
-                          title="Edit Event"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      {canDeleteEvents && (
-                        <button
-                          onClick={() => handleDelete(evt.id)}
-                          className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 hover:text-rose-200 transition-colors cursor-pointer"
-                          title="Delete Event"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                      <Link
-                        to={`/events/${evt.slug}`}
-                        target="_blank"
-                        className="p-1.5 inline-block rounded-lg bg-white/5 hover:bg-white/10 text-[#8B5CF6] hover:text-white transition-colors"
-                        title="Preview Public Page"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </Link>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredEvents.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-[#928A9F]">
+                      No events match the current filter.
                     </td>
                   </tr>
-                ))}
+                )}
               </tbody>
             </table>
           </div>
@@ -327,6 +417,7 @@ export const AdminEventsPage: React.FC = () => {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in">
           <div className="relative w-full max-w-2xl bg-[#0B0614] border border-[#8B5CF6]/30 rounded-2xl p-6 sm:p-8 shadow-2xl text-[#F5F3FF] max-h-[90vh] overflow-y-auto">
             <button
+              type="button"
               onClick={() => setIsModalOpen(false)}
               className="absolute top-5 right-5 p-2 rounded-lg bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             >
@@ -336,6 +427,13 @@ export const AdminEventsPage: React.FC = () => {
             <h2 className="text-2xl font-bold font-heading mb-6">
               {editingId ? "Edit Event" : "Create New Event"}
             </h2>
+
+            {modalError && (
+              <div className="mb-4 p-3 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
+                <span>{modalError}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSave} className="space-y-4">
               <div>
@@ -472,15 +570,17 @@ export const AdminEventsPage: React.FC = () => {
                   <label className="block text-xs font-semibold text-[#928A9F] uppercase tracking-wider">
                     Google Form URL
                   </label>
-                  <button
-                    type="button"
-                    onClick={handleAutoGenerateForm}
-                    disabled={isGeneratingForm}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[#C4B5FD] hover:text-white px-2.5 py-1 rounded-md bg-[#8B5CF6]/20 hover:bg-[#8B5CF6]/40 border border-[#8B5CF6]/40 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-[#A855F7]" />
-                    <span>{isGeneratingForm ? "Provisioning Form..." : "⚡ Auto-Generate via Apps Script"}</span>
-                  </button>
+                  {canCreateEvents && (
+                    <button
+                      type="button"
+                      onClick={handleAutoGenerateForm}
+                      disabled={isGeneratingForm}
+                      className="inline-flex items-center gap-1.5 text-xs font-bold text-[#C4B5FD] hover:text-white px-2.5 py-1 rounded-md bg-[#8B5CF6]/20 hover:bg-[#8B5CF6]/40 border border-[#8B5CF6]/40 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-[#A855F7]" />
+                      <span>{isGeneratingForm ? "Provisioning Form..." : "⚡ Auto-Generate via Apps Script"}</span>
+                    </button>
+                  )}
                 </div>
                 <input
                   type="url"
@@ -490,7 +590,7 @@ export const AdminEventsPage: React.FC = () => {
                   className="w-full px-3.5 py-2.5 rounded-lg bg-white/5 border border-white/10 focus:border-[#8B5CF6] focus:outline-none text-xs text-[#F5F3FF]"
                 />
                 <p className="text-[11px] text-[#928A9F] mt-1">
-                  Click the button above to automatically generate a real Google Form linked to your Google Sheet!
+                  Click the button above to automatically generate a real Google Form linked to your Google Sheet via server proxy.
                 </p>
               </div>
 
@@ -511,7 +611,7 @@ export const AdminEventsPage: React.FC = () => {
                 <Button type="button" variant="ghost" onClick={() => setIsModalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" variant="primary">
+                <Button type="submit" variant="primary" isLoading={isSaving}>
                   {editingId ? "Save Changes" : "Create Event"}
                 </Button>
               </div>

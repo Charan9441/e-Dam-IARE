@@ -28,18 +28,23 @@ export class ApiClient {
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const json = await response.json();
-        return json;
+        return {
+          ...json,
+          status: response.status,
+          success: typeof json.success === "boolean" ? json.success : response.ok,
+        };
       }
 
       return {
         success: response.ok,
         status: response.status,
+        error: response.ok ? undefined : "Request failed with an unexpected server response.",
       };
     } catch (err: unknown) {
       console.warn(`[ApiClient] Request to ${endpoint} failed:`, err);
       return {
         success: false,
-        error: err instanceof Error ? err.message : String(err),
+        error: "Unable to communicate with the server. Please try again.",
       };
     }
   }
@@ -59,7 +64,7 @@ export class ApiClient {
   }
 
   static async getEventBySlug(slug: string) {
-    return this.request(`/api/events/${slug}`);
+    return this.request(`/api/events/${encodeURIComponent(slug)}`);
   }
 
   static async createEvent(eventData: any) {
@@ -70,14 +75,14 @@ export class ApiClient {
   }
 
   static async updateEvent(slugOrId: string, eventData: any) {
-    return this.request(`/api/events/${slugOrId}`, {
+    return this.request(`/api/events/${encodeURIComponent(slugOrId)}`, {
       method: "PUT",
       body: JSON.stringify(eventData),
     });
   }
 
   static async deleteEvent(slugOrId: string) {
-    return this.request(`/api/events/${slugOrId}`, {
+    return this.request(`/api/events/${encodeURIComponent(slugOrId)}`, {
       method: "DELETE",
     });
   }
@@ -108,13 +113,42 @@ export class ApiClient {
     });
   }
 
+  static async updateCertificateStatus(certIdOrNumber: string, status: "valid" | "revoked", reason?: string) {
+    return this.request("/api/certificates", {
+      method: "PUT",
+      body: JSON.stringify({ certificateNumber: certIdOrNumber, status, revokedReason: reason }),
+    });
+  }
+
   static async verifyCertificate(certNumber: string) {
     return this.request(`/api/certificates/verify/${encodeURIComponent(certNumber)}`);
   }
 
-  // --- GOOGLE INTEGRATIONS ---
-  static async createGoogleForm(eventId: string) {
+  // --- GOOGLE INTEGRATIONS (Server-Proxied, Admin Authenticated) ---
+  static async createGoogleForm(payload: {
+    eventId: string;
+    title?: string;
+    description?: string;
+    date?: string;
+    time?: string;
+    venue?: string;
+    registrationOpen?: boolean;
+  }) {
     return this.request("/api/integrations/google/create-form", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async toggleGoogleForm(eventId: string, open: boolean) {
+    return this.request("/api/integrations/google/toggle-registration", {
+      method: "POST",
+      body: JSON.stringify({ eventId, open }),
+    });
+  }
+
+  static async syncGoogleRegistrations(eventId: string) {
+    return this.request("/api/integrations/google/sync-registrations", {
       method: "POST",
       body: JSON.stringify({ eventId }),
     });
@@ -151,7 +185,8 @@ export class ApiClient {
   static async getPresignedUploadUrl(data: {
     category: "banners" | "certificates" | "media" | "documents";
     filename: string;
-    contentType: string;
+    contentType: "image/jpeg" | "image/png" | "image/webp" | "application/pdf";
+    fileSizeBytes: number;
   }) {
     return this.request("/api/uploads/presigned-url", {
       method: "POST",

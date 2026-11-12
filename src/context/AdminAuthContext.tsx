@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { ApiClient } from "@/lib/api-client";
 
 export type AdminRole = "SUPER_ADMIN" | "ADMIN" | "EDITOR" | "VIEWER";
@@ -29,63 +30,36 @@ interface AdminAuthContextType {
 
 const AdminAuthContext = createContext<AdminAuthContextType | undefined>(undefined);
 
-const STORAGE_KEY = "edam_admin_session_user";
-
 export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthenticatedUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin");
 
-  const checkAuth = async () => {
-    setIsLoading(true);
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
+
+  const checkAuth = useCallback(async () => {
+    setIsChecking(true);
     try {
       const res = await ApiClient.getMe();
       if (res && res.authenticated && res.user) {
         setUser(res.user);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(res.user));
-        } catch {
-          // Ignore storage quota errors
-        }
         return;
       }
-
-      // Check stored session fallback
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.id && parsed.role) {
-            setUser(parsed);
-            return;
-          }
-        }
-      } catch {
-        // Ignore parse error
-      }
-
       setUser(null);
     } catch {
-      try {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          const parsed = JSON.parse(stored);
-          if (parsed && parsed.id && parsed.role) {
-            setUser(parsed);
-            return;
-          }
-        }
-      } catch {
-        // Ignore parse error
-      }
       setUser(null);
     } finally {
-      setIsLoading(false);
+      setAuthChecked(true);
+      setIsChecking(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    checkAuth();
-  }, []);
+    if (isAdminRoute && !authChecked && !isChecking) {
+      void checkAuth();
+    }
+  }, [isAdminRoute, authChecked, isChecking, checkAuth]);
 
   const login = async (username: string, password: string) => {
     const cleanUser = username.trim().toLowerCase();
@@ -95,78 +69,12 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       const res = await ApiClient.login({ username: cleanUser, password: cleanPass });
       if (res && res.success && res.user) {
         setUser(res.user);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(res.user));
-        } catch {
-          // Ignore storage quota
-        }
-        return { success: true };
-      }
-
-      // Fallback check for designated super admin credentials
-      const validAdminIdentifiers = [
-        "admin",
-        "edam",
-        "edam.iare@gmail.com",
-        "edamworkspaceiare@gmail.com",
-      ];
-      const isSuperAdminUser = validAdminIdentifiers.includes(cleanUser);
-      const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030" || cleanPass === "edam2026";
-
-      if (isSuperAdminUser && isSuperAdminPass) {
-        const superAdminUser: AuthenticatedUser = {
-          id: cleanUser.includes("workspace") || cleanUser === "edam"
-            ? "usr_edam_workspace_admin"
-            : "usr_edam_primary_admin",
-          username: cleanUser === "edam" || cleanUser.includes("workspace") ? "edam" : "admin",
-          email: cleanUser.includes("workspace") ? "edamworkspaceiare@gmail.com" : "edam.iare@gmail.com",
-          role: "SUPER_ADMIN",
-          fullName: cleanUser === "edam" || cleanUser.includes("workspace")
-            ? "e-DAM Workspace Administrator"
-            : "e-DAM Executive Administrator",
-        };
-        setUser(superAdminUser);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(superAdminUser));
-        } catch {
-          // Ignore storage quota
-        }
+        setAuthChecked(true);
         return { success: true };
       }
 
       return { success: false, error: res?.error || "Invalid username or password." };
     } catch (err: unknown) {
-      // Offline/Local dev fallback for designated super admin
-      const validAdminIdentifiers = [
-        "admin",
-        "edam",
-        "edam.iare@gmail.com",
-        "edamworkspaceiare@gmail.com",
-      ];
-      const isSuperAdminUser = validAdminIdentifiers.includes(cleanUser);
-      const isSuperAdminPass = cleanPass === "e-DAM@IARE@2030" || cleanPass === "edam2026";
-
-      if (isSuperAdminUser && isSuperAdminPass) {
-        const superAdminUser: AuthenticatedUser = {
-          id: cleanUser.includes("workspace") || cleanUser === "edam"
-            ? "usr_edam_workspace_admin"
-            : "usr_edam_primary_admin",
-          username: cleanUser === "edam" || cleanUser.includes("workspace") ? "edam" : "admin",
-          email: cleanUser.includes("workspace") ? "edamworkspaceiare@gmail.com" : "edam.iare@gmail.com",
-          role: "SUPER_ADMIN",
-          fullName: cleanUser === "edam" || cleanUser.includes("workspace")
-            ? "e-DAM Workspace Administrator"
-            : "e-DAM Executive Administrator",
-        };
-        setUser(superAdminUser);
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(superAdminUser));
-        } catch {
-          // Ignore storage quota
-        }
-        return { success: true };
-      }
-
       const msg = err instanceof Error ? err.message : "Authentication failed.";
       return { success: false, error: msg };
     }
@@ -177,11 +85,12 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       await ApiClient.logout();
     } finally {
       try {
-        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem("edam_admin_session_user");
       } catch {
-        // Ignore storage error
+        // Ignore storage cleanup error
       }
       setUser(null);
+      setAuthChecked(true);
     }
   };
 
@@ -197,6 +106,7 @@ export const AdminAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const canManageRegistrations = role === "SUPER_ADMIN" || role === "ADMIN";
   const canIssueCertificates = role === "SUPER_ADMIN" || role === "ADMIN";
   const canManageUsers = role === "SUPER_ADMIN";
+  const isLoading = isChecking || (isAdminRoute && !authChecked);
 
   return (
     <AdminAuthContext.Provider
